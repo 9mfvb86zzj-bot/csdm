@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { ref, set, get, update, onValue, off } from 'firebase/database'
+import { ref, set, get, update, onValue, off, push } from 'firebase/database'
 import { db } from './firebase'
 import { BLACK_CARDS, WHITE_CARDS, shuffle } from './cards'
+
+const VERSION = 'v2.1'
 
 function genCode() { return Math.random().toString(36).substring(2, 7).toUpperCase() }
 function genId()   { return Math.random().toString(36).substring(2, 12) }
@@ -15,13 +17,12 @@ const C = {
   bg: '#0D1B4B', bgDeep: '#080F2E', panel: '#112060',
   border: '#1E3A8A', blue: '#2563EB', blueHover: '#3B82F6',
   bluePale: '#BFDBFE', blueFaint: 'rgba(37,99,235,0.15)',
-  white: '#FFFFFF', gold: '#FBBF24', goldFaint: 'rgba(251,191,36,0.12)',
-  green: '#22C55E', greenFaint: 'rgba(34,197,94,0.12)',
-  muted: '#64748B', text: '#CBD5E1', bright: '#E2E8F0',
+  gold: '#FBBF24', goldFaint: 'rgba(251,191,36,0.12)',
+  green: '#22C55E', muted: '#64748B', text: '#CBD5E1', bright: '#E2E8F0',
 }
 
 export default function App() {
-  const [screen, setScreen]   = useState('home')
+  const [screen, setScreen]     = useState('home')
   const [roomCode, setRoomCode] = useState('')
   const playerId = useRef(getOrCreatePlayerId()).current
 
@@ -33,11 +34,25 @@ export default function App() {
 
 // ─── HOME ─────────────────────────────────────────────────────────────────────
 function HomeScreen({ playerId, onEnter }) {
-  const [name, setName]       = useState('')
-  const [code, setCode]       = useState('')
-  const [mode, setMode]       = useState('create')
-  const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState('')
+  const [name, setName]           = useState('')
+  const [code, setCode]           = useState('')
+  const [mode, setMode]           = useState('create')
+  const [loading, setLoading]     = useState(false)
+  const [error, setError]         = useState('')
+  const [publicRooms, setPublicRooms] = useState([])
+  const [showPublic, setShowPublic]   = useState(false)
+
+  // Load public rooms
+  useEffect(() => {
+    if (!showPublic) return
+    const r = ref(db, 'public_rooms')
+    const unsub = onValue(r, snap => {
+      if (!snap.exists()) { setPublicRooms([]); return }
+      const rooms = Object.values(snap.val()).filter(r => r.phase === 'lobby' && r.playerCount < 12)
+      setPublicRooms(rooms)
+    })
+    return () => off(r)
+  }, [showPublic])
 
   async function handleCreate() {
     if (!name.trim()) { setError('Escribí tu nombre'); return }
@@ -46,7 +61,7 @@ function HomeScreen({ playerId, onEnter }) {
     const whiteDeck = shuffle(WHITE_CARDS)
     const hand = whiteDeck.splice(0, 10)
     const room = {
-      code: roomCode, phase: 'lobby', hostId: playerId,
+      code: roomCode, phase: 'lobby', hostId: playerId, isPublic: false,
       currentBlack: null, blackDeck: shuffle(BLACK_CARDS), whiteDeck,
       submissions: [], votes: {}, roundWinner: null,
       players: {
@@ -57,25 +72,47 @@ function HomeScreen({ playerId, onEnter }) {
     setLoading(false); onEnter(roomCode)
   }
 
-  async function handleJoin() {
-    if (!name.trim()) { setError('Escribí tu nombre'); return }
-    if (!code.trim())  { setError('Ingresá el código'); return }
+  async function handleCreatePublic() {
+    if (!name.trim()) { setError('Escribí tu nombre primero'); return }
     setLoading(true); setError('')
-    const roomCode = code.trim().toUpperCase()
-    const snap = await get(ref(db, `rooms/${roomCode}`))
-    if (!snap.exists())          { setError('Sala no encontrada'); setLoading(false); return }
+    const roomCode = genCode()
+    const whiteDeck = shuffle(WHITE_CARDS)
+    const hand = whiteDeck.splice(0, 10)
+    const room = {
+      code: roomCode, phase: 'lobby', hostId: playerId, isPublic: true,
+      currentBlack: null, blackDeck: shuffle(BLACK_CARDS), whiteDeck,
+      submissions: [], votes: {}, roundWinner: null,
+      players: {
+        [playerId]: { id: playerId, name: name.trim(), hand, score: 0, submitted: false, submittedCard: null, vote: null, isHost: true }
+      }
+    }
+    await set(ref(db, `rooms/${roomCode}`), room)
+    // Register in public index
+    await set(ref(db, `public_rooms/${roomCode}`), { code: roomCode, host: name.trim(), phase: 'lobby', playerCount: 1, createdAt: Date.now() })
+    setLoading(false); onEnter(roomCode)
+  }
+
+  async function handleJoin(codeOverride) {
+    if (!name.trim()) { setError('Escribí tu nombre primero'); return }
+    const joinCode = (codeOverride || code).trim().toUpperCase()
+    if (!joinCode) { setError('Ingresá el código'); return }
+    setLoading(true); setError('')
+    const snap = await get(ref(db, `rooms/${joinCode}`))
+    if (!snap.exists())         { setError('Sala no encontrada'); setLoading(false); return }
     const room = snap.val()
-    if (room.phase !== 'lobby')  { setError('La partida ya comenzó'); setLoading(false); return }
+    if (room.phase !== 'lobby') { setError('La partida ya comenzó'); setLoading(false); return }
     if (Object.keys(room.players||{}).length >= 12) { setError('Sala llena'); setLoading(false); return }
-    // check if player already in room
-    if (room.players?.[playerId]) { setLoading(false); onEnter(roomCode); return }
+    if (room.players?.[playerId]) { setLoading(false); onEnter(joinCode); return }
     const whiteDeck = [...(room.whiteDeck || [])]
     const hand = whiteDeck.splice(0, 10)
-    await update(ref(db, `rooms/${roomCode}`), { whiteDeck })
-    await set(ref(db, `rooms/${roomCode}/players/${playerId}`), {
+    await update(ref(db, `rooms/${joinCode}`), { whiteDeck })
+    await set(ref(db, `rooms/${joinCode}/players/${playerId}`), {
       id: playerId, name: name.trim(), hand, score: 0, submitted: false, submittedCard: null, vote: null, isHost: false
     })
-    setLoading(false); onEnter(roomCode)
+    if (room.isPublic) {
+      await update(ref(db, `public_rooms/${joinCode}`), { playerCount: Object.keys(room.players||{}).length + 1 })
+    }
+    setLoading(false); onEnter(joinCode)
   }
 
   return (
@@ -85,35 +122,73 @@ function HomeScreen({ playerId, onEnter }) {
           <span style={s.logoMain}>CSDM</span>
           <span style={s.logoSub}>HASTA DONDE TE ANIMÁS</span>
         </div>
-        <p style={{ color: C.muted, textAlign: 'center', fontSize: 13, marginBottom: 28, marginTop: 8 }}>
+        <p style={{ color: C.muted, textAlign: 'center', fontSize: 13, marginBottom: 24, marginTop: 8 }}>
           Juego de cartas · +18 · 3 a 12 jugadores
         </p>
+
+        {/* Name input always visible */}
+        <input style={s.input} placeholder="Tu nombre..." value={name}
+          onChange={e => setName(e.target.value)} maxLength={20} />
+
         <div style={s.tabs}>
-          {['create','join'].map(m => (
-            <button key={m} style={mode===m ? s.tabOn : s.tabOff} onClick={() => setMode(m)}>
-              {m === 'create' ? 'Crear sala' : 'Unirse'}
+          {['create','join','public'].map(m => (
+            <button key={m} style={mode===m ? s.tabOn : s.tabOff}
+              onClick={() => { setMode(m); if (m==='public') setShowPublic(true) }}>
+              {m==='create' ? '+ Crear' : m==='join' ? '# Código' : '🌐 Públicas'}
             </button>
           ))}
         </div>
-        <input style={s.input} placeholder="Tu nombre..." value={name}
-          onChange={e => setName(e.target.value)}
-          onKeyDown={e => e.key==='Enter' && (mode==='create' ? handleCreate() : handleJoin())}
-          maxLength={20} />
-        {mode === 'join' && (
-          <input style={{...s.input, marginTop:10, letterSpacing:4, textTransform:'uppercase'}}
-            placeholder="Código de sala..." value={code}
-            onChange={e => setCode(e.target.value.toUpperCase())}
-            onKeyDown={e => e.key==='Enter' && handleJoin()}
-            maxLength={5} />
+
+        {mode === 'create' && (
+          <>
+            <button style={{...s.btnPrimary, opacity: loading ? 0.5 : 1}} disabled={loading} onClick={handleCreate}>
+              {loading ? 'Creando...' : 'Crear sala privada'}
+            </button>
+            <button style={{...s.btnSecondary, opacity: loading ? 0.5 : 1}} disabled={loading} onClick={handleCreatePublic}>
+              {loading ? 'Creando...' : '🌐 Crear sala pública'}
+            </button>
+          </>
         )}
+
+        {mode === 'join' && (
+          <>
+            <input style={{...s.input, marginTop:10, letterSpacing:4, textTransform:'uppercase'}}
+              placeholder="Código de sala..." value={code}
+              onChange={e => setCode(e.target.value.toUpperCase())}
+              onKeyDown={e => e.key==='Enter' && handleJoin()}
+              maxLength={5} />
+            <button style={{...s.btnPrimary, opacity: loading ? 0.5 : 1}} disabled={loading}
+              onClick={() => handleJoin()}>
+              {loading ? 'Entrando...' : 'Entrar a la sala'}
+            </button>
+          </>
+        )}
+
+        {mode === 'public' && (
+          <div style={s.publicList}>
+            {publicRooms.length === 0
+              ? <div style={s.emptyPublic}>
+                  No hay salas públicas abiertas.<br/>
+                  <span style={{color:C.bluePale}}>¡Creá una vos!</span>
+                </div>
+              : publicRooms.map(r => (
+                <div key={r.code} style={s.publicRow}>
+                  <div>
+                    <div style={{fontSize:14, color:C.bright, fontWeight:700}}>Sala de {r.host}</div>
+                    <div style={{fontSize:12, color:C.muted}}>{r.playerCount} jugador{r.playerCount!==1?'es':''} · esperando</div>
+                  </div>
+                  <button style={s.joinBtn} onClick={() => handleJoin(r.code)}>
+                    Unirse
+                  </button>
+                </div>
+              ))
+            }
+          </div>
+        )}
+
         {error && <div style={s.errorBox}>{error}</div>}
-        <button style={{...s.btnPrimary, opacity: loading ? 0.5 : 1}} disabled={loading}
-          onClick={mode==='create' ? handleCreate : handleJoin}>
-          {loading ? 'Cargando...' : mode==='create' ? '¡Crear sala!' : 'Entrar'}
-        </button>
-        <p style={{color:C.muted, fontSize:12, textAlign:'center', marginTop:14, lineHeight:1.6}}>
-          Creá una sala y compartí el código.<br/>Cada uno entra desde su propio dispositivo.
-        </p>
+
+        <div style={s.versionBadge}>{VERSION}</div>
       </div>
     </div>
   )
@@ -121,9 +196,10 @@ function HomeScreen({ playerId, onEnter }) {
 
 // ─── GAME ─────────────────────────────────────────────────────────────────────
 function GameScreen({ roomCode, playerId, onLeave }) {
-  const [room, setRoom]         = useState(null)
-  const [toast, setToast]       = useState('')
+  const [room, setRoom]               = useState(null)
+  const [toast, setToast]             = useState('')
   const [selectedIdx, setSelectedIdx] = useState(null)
+  const [voting, setVoting]           = useState(false) // prevent double-tap
 
   const showToast = msg => { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
@@ -141,20 +217,14 @@ function GameScreen({ roomCode, playerId, onLeave }) {
     </div>
   )
 
-  const players   = Object.values(room.players || {})
-  const me        = room.players?.[playerId]
-  const isHost    = me?.isHost
-  const votes     = room.votes || {}
+  const players     = Object.values(room.players || {})
+  const me          = room.players?.[playerId]
+  const isHost      = me?.isHost
+  const votes       = room.votes || {}
   const submissions = Array.isArray(room.submissions) ? room.submissions : []
+  const allVoted    = players.length >= 2 && players.every(p => p.vote !== null)
 
-  // ── check if all submitted / all voted ──
-  const allSubmitted = players.length >= 2 && players.every(p => p.submitted)
-  const allVoted     = players.length >= 2 && players.every(p => p.vote !== null)
-
-  // ── auto-transition to judging when all submitted ──
-  // handled server-side in submitCard
-
-  // ── ACTIONS ───────────────────────────────────────────────────────────────
+  // ── ACTIONS ─────────────────────────────────────────────────────────────────
 
   async function startGame() {
     const snap = await get(ref(db, `rooms/${roomCode}`))
@@ -162,16 +232,15 @@ function GameScreen({ roomCode, playerId, onLeave }) {
     if (Object.keys(r.players).length < 3) return
     let blackDeck = shuffle(BLACK_CARDS)
     const currentBlack = blackDeck.shift()
-    const updates = {
-      phase: 'playing', currentBlack, blackDeck,
-      submissions: [], votes: {}, roundWinner: null,
-    }
+    const updates = { phase: 'playing', currentBlack, blackDeck, submissions: [], votes: {}, roundWinner: null }
     Object.values(r.players).forEach(p => {
       updates[`players/${p.id}/submitted`]     = false
       updates[`players/${p.id}/submittedCard`] = null
       updates[`players/${p.id}/vote`]          = null
     })
     await update(ref(db, `rooms/${roomCode}`), updates)
+    // Update public room phase
+    if (r.isPublic) await update(ref(db, `public_rooms/${roomCode}`), { phase: 'playing' })
   }
 
   async function submitCard() {
@@ -179,23 +248,22 @@ function GameScreen({ roomCode, playerId, onLeave }) {
     const card    = me.hand[selectedIdx]
     const newHand = me.hand.filter((_, i) => i !== selectedIdx)
 
-    // fetch fresh state
     const snap = await get(ref(db, `rooms/${roomCode}`))
     const r    = snap.val()
     const pList = Object.values(r.players)
 
+    // mark this player as submitted
     const updates = {
       [`players/${playerId}/submitted`]:     true,
       [`players/${playerId}/submittedCard`]: card,
       [`players/${playerId}/hand`]:          newHand,
     }
 
-    // count how many will have submitted after this (including me)
-    const submittedAfter = pList.filter(p => p.submitted || p.id === playerId)
-    if (submittedAfter.length === pList.length) {
-      // build shuffled submissions and move to judging
+    // check if everyone will have submitted
+    const willBeSubmitted = pList.filter(p => p.submitted || p.id === playerId)
+    if (willBeSubmitted.length === pList.length) {
       const subs = pList.map(p => ({
-        playerId: p.id,
+        playerId:   p.id,
         playerName: p.name,
         card: p.id === playerId ? card : p.submittedCard
       }))
@@ -209,47 +277,70 @@ function GameScreen({ roomCode, playerId, onLeave }) {
   }
 
   async function voteCard(targetPlayerId) {
-    if (!me)                        return
-    if (me.vote !== null)           return   // ya votó
-    if (targetPlayerId === playerId) return   // no puede votar su propia carta
+    if (voting)                      return  // prevent double tap
+    if (!me)                         return
+    if (me.vote !== null)            return  // already voted
+    if (targetPlayerId === playerId) return  // can't vote own card
 
-    const snap = await get(ref(db, `rooms/${roomCode}`))
-    const r    = snap.val()
-    const currentVotes = r.votes || {}
-    const updVotes = { ...currentVotes, [targetPlayerId]: (currentVotes[targetPlayerId] || 0) + 1 }
+    setVoting(true)
+    try {
+      // Use a transaction-like approach: fetch fresh, write atomically
+      const snap = await get(ref(db, `rooms/${roomCode}`))
+      const r    = snap.val()
 
-    const updates = {
-      [`players/${playerId}/vote`]: targetPlayerId,
-      votes: updVotes,
-    }
+      // Re-check vote hasn't been cast (race condition guard)
+      if (r.players?.[playerId]?.vote !== null) { setVoting(false); return }
 
-    // check if everyone voted
-    const pList      = Object.values(r.players)
-    const votedCount = pList.filter(p => p.vote !== null || p.id === playerId).length
-    if (votedCount === pList.length) {
-      // find winner by votes
-      let maxV = 0, winnerId = null
-      Object.entries(updVotes).forEach(([pid, v]) => { if (v > maxV) { maxV = v; winnerId = pid } })
-      const winnerSub = submissions.find(s => s.playerId === winnerId)
-        || r.submissions?.find(s => s.playerId === winnerId)
-      updates.roundWinner = winnerSub || null
-      updates.phase       = 'result'
-      if (winnerId) updates[`players/${winnerId}/score`] = (r.players[winnerId]?.score || 0) + 1
+      const currentVotes = r.votes || {}
+      const updVotes     = { ...currentVotes, [targetPlayerId]: (currentVotes[targetPlayerId] || 0) + 1 }
+      const pList        = Object.values(r.players)
 
-      // refill hands
-      let deck = [...(r.whiteDeck || [])]
-      if (deck.length < players.length * 10) deck = [...deck, ...shuffle(WHITE_CARDS)]
-      pList.forEach(p => {
-        const currentHand = p.hand || []
-        const needed = 10 - currentHand.length
-        if (needed > 0) {
-          updates[`players/${p.id}/hand`] = [...currentHand, ...deck.splice(0, needed)]
+      const updates = {
+        [`players/${playerId}/vote`]: targetPlayerId,
+        votes: updVotes,
+      }
+
+      // Check if this is the last vote
+      const votedAfterThis = pList.filter(p => p.vote !== null || p.id === playerId)
+      if (votedAfterThis.length === pList.length) {
+        // Find winner
+        let maxV = 0, winnerId = null
+        Object.entries(updVotes).forEach(([pid, v]) => { if (v > maxV) { maxV = v; winnerId = pid } })
+
+        const allSubs = Array.isArray(r.submissions) ? r.submissions : []
+        const winnerSub = allSubs.find(s => s.playerId === winnerId) || null
+        updates.roundWinner = winnerSub
+        updates.phase       = 'result'
+
+        if (winnerId) {
+          updates[`players/${winnerId}/score`] = (r.players[winnerId]?.score || 0) + 1
         }
-      })
-      updates.whiteDeck = deck
-    }
 
-    await update(ref(db, `rooms/${roomCode}`), updates)
+        // Refill hands
+        let deck = [...(r.whiteDeck || [])]
+        if (deck.length < pList.length * 2) deck = [...deck, ...shuffle(WHITE_CARDS)]
+        pList.forEach(p => {
+          const currentHand = p.id === playerId ? newHand(p.hand, selectedIdx) : (p.hand || [])
+          const needed = 10 - currentHand.length
+          if (needed > 0) {
+            updates[`players/${p.id}/hand`] = [...currentHand, ...deck.splice(0, needed)]
+          }
+        })
+        updates.whiteDeck = deck
+      }
+
+      await update(ref(db, `rooms/${roomCode}`), updates)
+      showToast('Voto registrado ✓')
+    } catch(e) {
+      console.error('voteCard error:', e)
+    }
+    setVoting(false)
+  }
+
+  // helper — get hand without submitted card
+  function newHand(hand, idx) {
+    if (idx === null || !hand) return hand || []
+    return hand.filter((_, i) => i !== idx)
   }
 
   async function nextRound() {
@@ -259,10 +350,7 @@ function GameScreen({ roomCode, playerId, onLeave }) {
       ? r.blackDeck : shuffle(BLACK_CARDS)
     const currentBlack = blackDeck[0]
     blackDeck = blackDeck.slice(1)
-    const updates = {
-      phase: 'playing', currentBlack, blackDeck,
-      submissions: [], votes: {}, roundWinner: null,
-    }
+    const updates = { phase: 'playing', currentBlack, blackDeck, submissions: [], votes: {}, roundWinner: null }
     Object.values(r.players).forEach(p => {
       updates[`players/${p.id}/submitted`]     = false
       updates[`players/${p.id}/submittedCard`] = null
@@ -277,6 +365,7 @@ function GameScreen({ roomCode, playerId, onLeave }) {
       if (next) await update(ref(db, `rooms/${roomCode}/players/${next.id}`), { isHost: true })
     }
     await set(ref(db, `rooms/${roomCode}/players/${playerId}`), null)
+    if (room.isPublic) await set(ref(db, `public_rooms/${roomCode}`), null)
     onLeave()
   }
 
@@ -291,6 +380,11 @@ function GameScreen({ roomCode, playerId, onLeave }) {
               Código: <strong style={{color:C.gold, letterSpacing:3}}>{roomCode}</strong>
             </div>
           </div>
+          {room.isPublic && (
+            <div style={{...s.shareBox, background:'rgba(34,197,94,0.08)', border:`1px solid ${C.green}33`, marginBottom:12}}>
+              🌐 Sala pública — visible en el listado para que cualquiera se una
+            </div>
+          )}
           <div style={s.sectionLabel}>JUGADORES</div>
           <div style={{display:'flex', flexDirection:'column', gap:8, marginBottom:20}}>
             {players.map(p => (
@@ -302,8 +396,7 @@ function GameScreen({ roomCode, playerId, onLeave }) {
             ))}
           </div>
           <div style={s.shareBox}>
-            📲 Compartí el código <strong style={{color:C.gold}}>{roomCode}</strong> con tus amigos.<br/>
-            Cada uno entra desde su celular o computadora.
+            📲 Compartí el código <strong style={{color:C.gold}}>{roomCode}</strong> para que se unan.
           </div>
           {players.length < 3
             ? <div style={s.waitBox}>Esperando jugadores… (mínimo 3, hay {players.length})</div>
@@ -320,7 +413,7 @@ function GameScreen({ roomCode, playerId, onLeave }) {
 
   // ── RESULT ─────────────────────────────────────────────────────────────────
   if (room.phase === 'result') {
-    const sorted = [...players].sort((a,b) => b.score - a.score)
+    const sorted  = [...players].sort((a,b) => b.score - a.score)
     const allSubs = Array.isArray(room.submissions) ? room.submissions : []
     return (
       <div style={s.page}>
@@ -375,8 +468,8 @@ function GameScreen({ roomCode, playerId, onLeave }) {
 
   // ── JUDGING ────────────────────────────────────────────────────────────────
   if (room.phase === 'judging') {
-    const myVote   = me?.vote ?? null
-    const allSubs  = Array.isArray(room.submissions) ? room.submissions : []
+    const myVote     = me?.vote ?? null
+    const allSubs    = Array.isArray(room.submissions) ? room.submissions : []
     const votedCount = players.filter(p => p.vote !== null).length
 
     return (
@@ -386,25 +479,26 @@ function GameScreen({ roomCode, playerId, onLeave }) {
           <BlackCard text={room.currentBlack} />
           <div style={s.phaseTitle}>
             {myVote === null
-              ? '👆 Votá la carta más graciosa (no podés votar la tuya)'
+              ? '👆 Tocá la carta más graciosa para votar (no podés votar la tuya)'
               : `✅ Voto registrado — ${votedCount}/${players.length} votaron`}
           </div>
           <div style={s.cardsGrid}>
             {allSubs.map((sub, i) => {
-              const isMine   = sub.playerId === playerId
-              const iVoted   = myVote === sub.playerId
-              const canVote  = myVote === null && !isMine
-              const vCount   = votes[sub.playerId] || 0
+              const isMine  = sub.playerId === playerId
+              const iVoted  = myVote === sub.playerId
+              const canVote = myVote === null && !isMine && !voting
               return (
                 <div
                   key={i}
                   onClick={() => canVote && voteCard(sub.playerId)}
                   style={{
                     ...s.subCard,
-                    ...(iVoted ? s.subVoted : {}),
-                    ...(isMine ? s.subMine : {}),
-                    cursor: canVote ? 'pointer' : 'default',
-                    opacity: myVote !== null && !iVoted ? 0.7 : 1,
+                    ...(iVoted  ? s.subVoted : {}),
+                    ...(isMine  ? s.subMine  : {}),
+                    ...(canVote ? s.subHover : {}),
+                    cursor:  canVote ? 'pointer' : 'default',
+                    opacity: myVote !== null && !iVoted ? 0.6 : 1,
+                    transform: iVoted ? 'translateY(-4px)' : 'none',
                   }}
                 >
                   <p style={{color:'#1a1a2e', fontSize:14, fontWeight:600, lineHeight:1.4, margin:0}}>
@@ -412,8 +506,8 @@ function GameScreen({ roomCode, playerId, onLeave }) {
                   </p>
                   {isMine && <div style={s.mineBadge}>Tu carta</div>}
                   {iVoted && <div style={s.votedBadge}>Tu voto ✓</div>}
-                  {allVoted && vCount > 0 && (
-                    <div style={s.voteCountBadge}>{vCount} voto{vCount===1?'':'s'}</div>
+                  {allVoted && (votes[sub.playerId]||0) > 0 && (
+                    <div style={s.voteCountBadge}>{votes[sub.playerId]} voto{votes[sub.playerId]===1?'':'s'}</div>
                   )}
                 </div>
               )
@@ -446,9 +540,7 @@ function GameScreen({ roomCode, playerId, onLeave }) {
             {submittedCount}/{players.length} enviadas
           </span>
         </div>
-
         <BlackCard text={room.currentBlack} />
-
         {iSubmitted ? (
           <div style={{textAlign:'center'}}>
             <div style={{color:C.green, fontSize:16, fontWeight:700, marginBottom:12}}>
@@ -472,14 +564,13 @@ function GameScreen({ roomCode, playerId, onLeave }) {
             <div style={s.handGrid}>
               {(me?.hand || []).map((card, i) => (
                 <HandCard
-                  key={i}
-                  text={card}
+                  key={i} text={card}
                   selected={selectedIdx === i}
                   onSelect={() => setSelectedIdx(selectedIdx === i ? null : i)}
                   onEdit={newText => {
-                    const newHand = [...(me.hand||[])]
-                    newHand[i] = newText
-                    update(ref(db, `rooms/${roomCode}/players/${playerId}`), { hand: newHand })
+                    const newH = [...(me.hand||[])]
+                    newH[i] = newText
+                    update(ref(db, `rooms/${roomCode}/players/${playerId}`), { hand: newH })
                   }}
                 />
               ))}
@@ -498,12 +589,11 @@ function GameScreen({ roomCode, playerId, onLeave }) {
   )
 }
 
-// ─── SUB-COMPONENTS ───────────────────────────────────────────────────────────
+// ─── SUB-COMPONENTS ──────────────────────────────────────────────────────────
 function HandCard({ text, selected, onSelect, onEdit }) {
   const [editing, setEditing] = useState(false)
   const [val, setVal]         = useState(text)
   useEffect(() => setVal(text), [text])
-
   return (
     <div style={{...s.handCard, ...(selected ? s.handCardOn : {})}}
       onClick={() => { if (!editing) onSelect() }}>
@@ -513,15 +603,12 @@ function HandCard({ text, selected, onSelect, onEdit }) {
           onBlur={() => { setEditing(false); onEdit(val) }}
           onClick={e => e.stopPropagation()} rows={3} />
       ) : (
-        <p style={{color:'#1a1a2e', fontSize:14, fontWeight:600, lineHeight:1.4, margin:0, flex:1}}>
-          {val}
-        </p>
+        <p style={{color:'#1a1a2e', fontSize:14, fontWeight:600, lineHeight:1.4, margin:0, flex:1}}>{val}</p>
       )}
-      <button style={s.editBtn}
-        onClick={e => { e.stopPropagation(); setEditing(!editing) }}>
-        {editing ? 'ok' : '✏️'}
+      <button style={s.editBtn} onClick={e => { e.stopPropagation(); setEditing(!editing) }}>
+        {editing ? '✓ ok' : '✏️'}
       </button>
-      {selected && !editing && <div style={s.selBadge}>✓</div>}
+      {selected && !editing && <div style={s.selBadge}>✓ Seleccionada</div>}
     </div>
   )
 }
@@ -547,9 +634,7 @@ function BlackCard({ text }) {
   return (
     <div style={s.blackCard}>
       <div style={{fontSize:10, letterSpacing:3, color:'#333', fontWeight:700, marginBottom:14}}>CSDM</div>
-      <p style={{color:'#fff', fontSize:20, fontWeight:700, lineHeight:1.5, margin:0}}>
-        {text || 'Cargando…'}
-      </p>
+      <p style={{color:'#fff', fontSize:20, fontWeight:700, lineHeight:1.5, margin:0}}>{text||'Cargando…'}</p>
     </div>
   )
 }
@@ -560,7 +645,7 @@ function Toast({ msg }) {
       position:'fixed', bottom:24, left:'50%', transform:'translateX(-50%)',
       background:C.blue, color:'#fff', padding:'12px 24px', borderRadius:30,
       fontSize:14, fontWeight:700, boxShadow:'0 8px 32px rgba(0,0,0,0.4)',
-      zIndex:999, whiteSpace:'nowrap',
+      zIndex:999, whiteSpace:'nowrap', pointerEvents:'none',
     }}>{msg}</div>
   )
 }
@@ -595,17 +680,17 @@ const s = {
     color:C.bluePale, marginTop:6, fontWeight:600,
   },
   tabs: {
-    display:'flex', gap:8, marginBottom:18,
+    display:'flex', gap:6, margin:'16px 0',
     background:'rgba(0,0,0,0.3)', borderRadius:10, padding:4,
   },
   tabOn: {
     flex:1, background:C.blue, border:'none', color:'#fff',
-    borderRadius:8, padding:10, fontSize:14, cursor:'pointer',
+    borderRadius:8, padding:'8px 4px', fontSize:13, cursor:'pointer',
     fontFamily:'inherit', fontWeight:700,
   },
   tabOff: {
     flex:1, background:'transparent', border:'none', color:C.muted,
-    borderRadius:8, padding:10, fontSize:14, cursor:'pointer',
+    borderRadius:8, padding:'8px 4px', fontSize:13, cursor:'pointer',
     fontFamily:'inherit', fontWeight:600,
   },
   input: {
@@ -622,7 +707,14 @@ const s = {
     width:'100%', background:`linear-gradient(135deg, ${C.blue}, ${C.blueHover})`,
     border:'none', color:'#fff', borderRadius:12, padding:15,
     fontSize:16, fontWeight:800, letterSpacing:1, cursor:'pointer',
-    fontFamily:'inherit', marginTop:16, boxShadow:`0 8px 24px ${C.blue}44`,
+    fontFamily:'inherit', marginTop:12, boxShadow:`0 8px 24px ${C.blue}44`,
+  },
+  btnSecondary: {
+    width:'100%', background:'transparent',
+    border:`1px solid ${C.border}`,
+    color:C.bluePale, borderRadius:12, padding:13,
+    fontSize:14, fontWeight:700, cursor:'pointer',
+    fontFamily:'inherit', marginTop:8,
   },
   btnGhost: {
     width:'100%', background:'transparent', border:`1px solid ${C.border}`,
@@ -646,13 +738,33 @@ const s = {
   },
   shareBox: {
     background:'rgba(251,191,36,0.08)', border:`1px solid ${C.gold}33`,
-    borderRadius:12, padding:16, fontSize:14, color:C.text,
+    borderRadius:12, padding:14, fontSize:14, color:C.text,
     lineHeight:1.6, textAlign:'center', marginBottom:16,
   },
   waitBox: {
     background:C.blueFaint, border:`1px solid ${C.border}`,
     borderRadius:10, padding:14, color:C.bluePale,
     textAlign:'center', fontSize:14, marginTop:16,
+  },
+  publicList: { display:'flex', flexDirection:'column', gap:8, marginTop:4 },
+  emptyPublic: {
+    background:'rgba(255,255,255,0.04)', border:`1px solid ${C.border}`,
+    borderRadius:10, padding:20, textAlign:'center',
+    color:C.muted, fontSize:14, lineHeight:1.8,
+  },
+  publicRow: {
+    display:'flex', justifyContent:'space-between', alignItems:'center',
+    background:'rgba(255,255,255,0.04)', border:`1px solid ${C.border}`,
+    borderRadius:10, padding:'12px 14px',
+  },
+  joinBtn: {
+    background:C.blue, border:'none', color:'#fff',
+    borderRadius:8, padding:'8px 16px', fontSize:13,
+    cursor:'pointer', fontFamily:'inherit', fontWeight:700,
+  },
+  versionBadge: {
+    textAlign:'center', color:C.muted, fontSize:11,
+    marginTop:20, letterSpacing:2, fontWeight:600,
   },
   header: {
     width:'100%', maxWidth:640,
@@ -664,14 +776,8 @@ const s = {
   },
   body: { width:'100%', maxWidth:620, padding:'12px 0' },
   progressRow: { display:'flex', alignItems:'center', gap:10, marginBottom:16 },
-  track: {
-    flex:1, height:4, background:'rgba(255,255,255,0.08)',
-    borderRadius:2, overflow:'hidden',
-  },
-  fill: {
-    height:'100%', background:`linear-gradient(90deg, ${C.blue}, ${C.blueHover})`,
-    borderRadius:2, transition:'width 0.5s ease',
-  },
+  track: { flex:1, height:4, background:'rgba(255,255,255,0.08)', borderRadius:2, overflow:'hidden' },
+  fill: { height:'100%', background:`linear-gradient(90deg, ${C.blue}, ${C.blueHover})`, borderRadius:2, transition:'width 0.5s ease' },
   blackCard: {
     background:'#080808', border:'3px solid #1a1a2e', borderRadius:16,
     padding:'26px 24px', marginBottom:20, boxShadow:'0 12px 40px rgba(0,0,0,0.6)',
@@ -699,7 +805,7 @@ const s = {
   },
   editBtn: {
     background:'transparent', border:'none', cursor:'pointer',
-    fontSize:14, padding:'2px 4px', alignSelf:'flex-end', marginTop:4,
+    fontSize:12, padding:'2px 4px', alignSelf:'flex-end', marginTop:4, color:'#888',
   },
   selBadge: {
     position:'absolute', bottom:8, right:8,
@@ -732,14 +838,9 @@ const s = {
     position:'relative', display:'flex', flexDirection:'column',
     justifyContent:'center', boxShadow:'0 4px 16px rgba(0,0,0,0.3)',
   },
-  subVoted: {
-    border:`3px solid ${C.blue}`,
-    boxShadow:`0 8px 24px ${C.blue}44`,
-  },
-  subMine: {
-    border:`3px solid ${C.gold}44`,
-    opacity: 0.85,
-  },
+  subHover: { boxShadow:'0 8px 28px rgba(0,0,0,0.4)' },
+  subVoted: { border:`3px solid ${C.blue}`, boxShadow:`0 8px 24px ${C.blue}44` },
+  subMine:  { border:`3px solid ${C.gold}55`, opacity:0.8 },
   mineBadge: {
     position:'absolute', top:-8, left:-8,
     background:C.gold, color:'#000', fontSize:10, fontWeight:800,
@@ -761,7 +862,6 @@ const s = {
   winnerBox: {
     background:C.panel, border:`2px solid ${C.gold}44`, borderRadius:16,
     padding:20, marginBottom:20, textAlign:'center',
-    boxShadow:`0 0 40px ${C.gold}18`,
   },
   winnerWhite: {
     background:'#fff', borderRadius:12, padding:18,
