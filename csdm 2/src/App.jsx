@@ -3,7 +3,7 @@ import { ref, set, get, update, onValue, off } from 'firebase/database'
 import { db } from './firebase'
 import { BLACK_CARDS, WHITE_CARDS, shuffle } from './cards'
 
-const VERSION = 'v4.0'
+const VERSION = 'v5.0'
 
 function genCode() { return Math.random().toString(36).substring(2, 7).toUpperCase() }
 function genId()   { return Math.random().toString(36).substring(2, 12) }
@@ -12,21 +12,132 @@ function getOrCreatePlayerId() {
   if (!id) { id = genId(); sessionStorage.setItem('csdm_pid', id) }
   return id
 }
+function getInviteLink(code) {
+  return `${window.location.origin}${window.location.pathname}?sala=${code}`
+}
 
 const C = {
   bg:'#0D1B4B', bgDeep:'#080F2E', panel:'#112060',
   border:'#1E3A8A', blue:'#2563EB', blueHover:'#3B82F6',
   bluePale:'#BFDBFE', blueFaint:'rgba(37,99,235,0.15)',
   gold:'#FBBF24', goldFaint:'rgba(251,191,36,0.12)',
-  green:'#22C55E', muted:'#64748B', text:'#CBD5E1', bright:'#E2E8F0',
+  green:'#22C55E', greenFaint:'rgba(34,197,94,0.12)',
+  muted:'#64748B', text:'#CBD5E1', bright:'#E2E8F0',
 }
 
 export default function App() {
   const [screen, setScreen]     = useState('home')
   const [roomCode, setRoomCode] = useState('')
+  const [autoName, setAutoName] = useState('')
   const playerId = useRef(getOrCreatePlayerId()).current
-  if (screen === 'home') return <HomeScreen playerId={playerId} onEnter={code => { setRoomCode(code); setScreen('game') }} />
-  return <GameScreen roomCode={roomCode} playerId={playerId} onLeave={() => setScreen('home')} />
+
+  // Handle ?sala=CODE in URL — auto-fill join
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const salaCode = params.get('sala')
+    if (salaCode) {
+      setRoomCode(salaCode.toUpperCase())
+      setScreen('join-from-link')
+    }
+  }, [])
+
+  if (screen === 'join-from-link') {
+    return <JoinFromLink
+      roomCode={roomCode}
+      playerId={playerId}
+      onEnter={code => { setRoomCode(code); setScreen('game') }}
+      onCancel={() => {
+        window.history.replaceState({}, '', window.location.pathname)
+        setScreen('home')
+      }}
+    />
+  }
+  if (screen === 'home') {
+    return <HomeScreen playerId={playerId} onEnter={code => { setRoomCode(code); setScreen('game') }} />
+  }
+  return <GameScreen roomCode={roomCode} playerId={playerId} onLeave={() => {
+    window.history.replaceState({}, '', window.location.pathname)
+    setScreen('home')
+  }} />
+}
+
+// ─── JOIN FROM LINK ───────────────────────────────────────────────────────────
+function JoinFromLink({ roomCode, playerId, onEnter, onCancel }) {
+  const [name, setName]       = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError]     = useState('')
+  const [roomInfo, setRoomInfo] = useState(null)
+
+  useEffect(() => {
+    get(ref(db, `rooms/${roomCode}`)).then(snap => {
+      if (snap.exists()) setRoomInfo(snap.val())
+      else setError('Sala no encontrada o ya expiró.')
+    })
+  }, [roomCode])
+
+  async function join() {
+    if (!name.trim()) { setError('Escribí tu nombre'); return }
+    setLoading(true); setError('')
+    try {
+      const snap = await get(ref(db, `rooms/${roomCode}`))
+      if (!snap.exists()) { setError('Sala no encontrada'); setLoading(false); return }
+      const room = snap.val()
+      if (room.phase !== 'lobby') { setError('La partida ya comenzó'); setLoading(false); return }
+      const currentPlayers = room.players || {}
+      if (Object.keys(currentPlayers).length >= 12) { setError('Sala llena'); setLoading(false); return }
+      const wd = [...(room.whiteDeck || [])]
+      const hand = wd.length >= 10 ? wd.splice(0, 10) : shuffle(WHITE_CARDS).slice(0, 10)
+      const existing = currentPlayers[playerId]
+      await update(ref(db, `rooms/${roomCode}`), {
+        [`players/${playerId}`]: {
+          id: playerId, name: name.trim(),
+          hand: existing?.hand || hand,
+          score: existing?.score || 0,
+          submitted: false, submittedCard: null, vote: null, isHost: false,
+        },
+        ...(!existing ? { whiteDeck: wd } : {}),
+      })
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname)
+      setLoading(false); onEnter(roomCode)
+    } catch(e) {
+      setError('Error al conectar. Intentá de nuevo.')
+      setLoading(false)
+    }
+  }
+
+  const hostName = roomInfo ? Object.values(roomInfo.players||{}).find(p=>p.isHost)?.name : null
+  const playerCount = roomInfo ? Object.keys(roomInfo.players||{}).length : 0
+
+  return (
+    <div style={s.page}>
+      <div style={s.homeCard}>
+        <div style={{textAlign:'center', marginBottom:20}}>
+          <span style={s.logoMain}>CSDM</span>
+        </div>
+        {roomInfo && roomInfo.phase !== 'lobby' ? (
+          <div style={s.errorBox}>Esta partida ya comenzó. No podés unirte.</div>
+        ) : (
+          <>
+            <div style={{background:C.goldFaint, border:`1px solid ${C.gold}44`, borderRadius:12, padding:16, textAlign:'center', marginBottom:20}}>
+              <div style={{fontSize:12, color:C.gold, fontWeight:700, letterSpacing:2, marginBottom:6}}>TE INVITARON A JUGAR</div>
+              {hostName && <div style={{fontSize:15, color:C.bright}}>Sala de <strong>{hostName}</strong></div>}
+              <div style={{fontSize:13, color:C.muted, marginTop:4}}>{playerCount} jugador{playerCount!==1?'es':''} esperando · Código: <strong style={{color:C.gold}}>{roomCode}</strong></div>
+            </div>
+            <input style={s.input} placeholder="Tu nombre..." value={name}
+              onChange={e=>{setName(e.target.value); setError('')}}
+              onKeyDown={e=>e.key==='Enter'&&join()}
+              maxLength={20} autoFocus />
+            {error && <div style={s.errorBox}>{error}</div>}
+            <button style={{...s.btnPrimary, opacity:loading?.5:1}} disabled={loading} onClick={join}>
+              {loading ? 'Entrando...' : '¡Unirme a la partida!'}
+            </button>
+          </>
+        )}
+        <button style={s.btnGhost} onClick={onCancel}>Cancelar</button>
+      </div>
+    </div>
+  )
 }
 
 // ─── HOME ─────────────────────────────────────────────────────────────────────
@@ -42,7 +153,7 @@ function HomeScreen({ playerId, onEnter }) {
     if (mode !== 'public') return
     const r = ref(db, 'public_rooms')
     const unsub = onValue(r, snap => {
-      setPublicRooms(snap.exists() ? Object.values(snap.val()).filter(r => r.phase==='lobby') : [])
+      setPublicRooms(snap.exists() ? Object.values(snap.val()).filter(r=>r.phase==='lobby') : [])
     })
     return () => off(r)
   }, [mode])
@@ -74,35 +185,18 @@ function HomeScreen({ playerId, onEnter }) {
       if (!snap.exists())       { setError('Sala no encontrada'); setLoading(false); return }
       const room = snap.val()
       if (room.phase!=='lobby') { setError('La partida ya comenzó'); setLoading(false); return }
-      const currentPlayers = room.players || {}
-      if (Object.keys(currentPlayers).length >= 12) { setError('Sala llena'); setLoading(false); return }
-
-      // Always write the player (overwrite if already exists with stale data)
+      const cur = room.players || {}
+      if (Object.keys(cur).length >= 12) { setError('Sala llena'); setLoading(false); return }
       const wd = [...(room.whiteDeck||[])]
-      const hand = wd.length >= 10 ? wd.splice(0,10) : [...WHITE_CARDS.slice(0,10)]
-      const existingPlayer = currentPlayers[playerId]
-      const playerData = {
-        id: playerId,
-        name: name.trim(),
-        hand: existingPlayer?.hand || hand,
-        score: existingPlayer?.score || 0,
-        submitted: false,
-        submittedCard: null,
-        vote: null,
-        isHost: false,
-      }
-      // Write player and update deck atomically
-      const updates = { [`players/${playerId}`]: playerData }
-      if (!existingPlayer) updates.whiteDeck = wd
-      await update(ref(db,`rooms/${jc}`), updates)
-      if (room.isPublic && !existingPlayer) {
-        await update(ref(db,`public_rooms/${jc}`), { playerCount: Object.keys(currentPlayers).length + 1 })
-      }
+      const hand = wd.length >= 10 ? wd.splice(0,10) : shuffle(WHITE_CARDS).slice(0,10)
+      const existing = cur[playerId]
+      await update(ref(db,`rooms/${jc}`), {
+        [`players/${playerId}`]: { id:playerId, name:name.trim(), hand:existing?.hand||hand, score:existing?.score||0, submitted:false, submittedCard:null, vote:null, isHost:false },
+        ...(!existing ? { whiteDeck:wd } : {})
+      })
+      if (room.isPublic && !existing) await update(ref(db,`public_rooms/${jc}`), { playerCount:Object.keys(cur).length+1 })
       setLoading(false); onEnter(jc)
-    } catch(e) {
-      setError('Error al conectar. Intentá de nuevo.')
-      setLoading(false)
-    }
+    } catch(e) { setError('Error al conectar. Intentá de nuevo.'); setLoading(false) }
   }
 
   return (
@@ -157,14 +251,19 @@ function GameScreen({ roomCode, playerId, onLeave }) {
   const [room, setRoom]               = useState(null)
   const [toast, setToast]             = useState('')
   const [selectedIdx, setSelectedIdx] = useState(null)
-  const [screen, setScreen]           = useState('game') // game | editCards | editBlack
+  const [editorScreen, setEditorScreen] = useState(null) // null | 'white' | 'black'
 
   const showToast = msg => { setToast(msg); setTimeout(()=>setToast(''),2500) }
 
   useEffect(() => {
     const r = ref(db,`rooms/${roomCode}`)
-    const unsub = onValue(r, snap=>{ if(snap.exists()) setRoom(snap.val()) })
-    return ()=>off(r)
+    // onValue with full snapshot — always replace entire room state
+    const unsub = onValue(r, snap => {
+      if (snap.exists()) {
+        setRoom(snap.val())
+      }
+    })
+    return () => off(r)
   }, [roomCode])
 
   if (!room) return (
@@ -175,26 +274,24 @@ function GameScreen({ roomCode, playerId, onLeave }) {
     </div>
   )
 
+  if (editorScreen) return (
+    <CardEditor roomCode={roomCode} type={editorScreen} onBack={()=>setEditorScreen(null)} />
+  )
+
   const players     = Object.values(room.players||{})
   const me          = room.players?.[playerId]
   const isHost      = me?.isHost
   const votes       = room.votes||{}
   const submissions = Array.isArray(room.submissions) ? room.submissions : []
 
-  // ── Card editor screens ────────────────────────────────────────────────────
-  if (screen==='editCards') return <CardEditor roomCode={roomCode} playerId={playerId} type="white" onBack={()=>setScreen('game')} />
-  if (screen==='editBlack') return <CardEditor roomCode={roomCode} playerId={playerId} type="black" onBack={()=>setScreen('game')} />
-
-  // ── Actions ───────────────────────────────────────────────────────────────
-
   async function startGame() {
     const snap = await get(ref(db,`rooms/${roomCode}`)); const r = snap.val()
-    if (Object.keys(r.players).length < 2) return
-    // Use room's custom decks if set, otherwise defaults
-    const bd = Array.isArray(r.customBlackDeck) && r.customBlackDeck.length>0 ? shuffle([...r.customBlackDeck]) : shuffle(BLACK_CARDS)
+    const pList = Object.values(r.players||{})
+    if (pList.length < 2) return
+    const bd = Array.isArray(r.customBlackDeck)&&r.customBlackDeck.length>0 ? shuffle([...r.customBlackDeck]) : shuffle(BLACK_CARDS)
     const currentBlack = bd[0]
     const updates = { phase:'playing', currentBlack, blackDeck:bd.slice(1), submissions:[], votes:{}, roundWinner:null }
-    Object.values(r.players).forEach(p=>{
+    pList.forEach(p=>{
       updates[`players/${p.id}/submitted`]=false
       updates[`players/${p.id}/submittedCard`]=null
       updates[`players/${p.id}/vote`]=null
@@ -208,14 +305,14 @@ function GameScreen({ roomCode, playerId, onLeave }) {
     const card = me.hand[selectedIdx]
     const newHand = me.hand.filter((_,i)=>i!==selectedIdx)
     const snap = await get(ref(db,`rooms/${roomCode}`)); const r = snap.val()
-    const pList = Object.values(r.players)
+    const pList = Object.values(r.players||{})
     const updates = {
       [`players/${playerId}/submitted`]:true,
       [`players/${playerId}/submittedCard`]:card,
       [`players/${playerId}/hand`]:newHand,
     }
-    const willSubmitted = pList.filter(p=>p.submitted||p.id===playerId)
-    if (willSubmitted.length===pList.length) {
+    const willSubmit = pList.filter(p=>p.submitted||p.id===playerId)
+    if (willSubmit.length===pList.length) {
       updates.submissions = shuffle(pList.map(p=>({ playerId:p.id, playerName:p.name, card:p.id===playerId?card:p.submittedCard })))
       updates.phase='judging'
     }
@@ -223,7 +320,6 @@ function GameScreen({ roomCode, playerId, onLeave }) {
     setSelectedIdx(null); showToast('Carta enviada ✓')
   }
 
-  // Simple vote: just write this player's vote. Host advances manually.
   async function voteCard(targetPlayerId) {
     if (!me||me.vote!==null||targetPlayerId===playerId) return
     await update(ref(db,`rooms/${roomCode}`), {
@@ -234,13 +330,11 @@ function GameScreen({ roomCode, playerId, onLeave }) {
   }
 
   async function advanceToResult() {
-    // tally winner
     const snap = await get(ref(db,`rooms/${roomCode}`)); const r = snap.val()
     const allSubs = Array.isArray(r.submissions)?r.submissions:[]
     const v = r.votes||{}
     let maxV=0, winnerId=null
     Object.entries(v).forEach(([pid,n])=>{ if(n>maxV){maxV=n;winnerId=pid} })
-    // if no votes at all, no winner
     const winnerSub = allSubs.find(s=>s.playerId===winnerId)||null
     const updates = { phase:'result', roundWinner:winnerSub||null }
     if (winnerId) updates[`players/${winnerId}/score`]=(r.players[winnerId]?.score||0)+1
@@ -249,14 +343,14 @@ function GameScreen({ roomCode, playerId, onLeave }) {
 
   async function nextRound() {
     const snap = await get(ref(db,`rooms/${roomCode}`)); const r = snap.val()
+    const pList = Object.values(r.players||{})
     const bd = Array.isArray(r.blackDeck)&&r.blackDeck.length>0 ? r.blackDeck : shuffle(BLACK_CARDS)
     const currentBlack = bd[0]
-    // refill hands
     const customWhite = Array.isArray(r.customWhiteDeck)&&r.customWhiteDeck.length>0 ? r.customWhiteDeck : WHITE_CARDS
     let deck = [...(r.whiteDeck||[])]
-    if (deck.length < Object.keys(r.players).length*2) deck=[...deck,...shuffle(customWhite)]
+    if (deck.length < pList.length*2) deck=[...deck,...shuffle(customWhite)]
     const updates = { phase:'playing', currentBlack, blackDeck:bd.slice(1), submissions:[], votes:{}, roundWinner:null }
-    Object.values(r.players).forEach(p=>{
+    pList.forEach(p=>{
       updates[`players/${p.id}/submitted`]=false
       updates[`players/${p.id}/submittedCard`]=null
       updates[`players/${p.id}/vote`]=null
@@ -274,16 +368,27 @@ function GameScreen({ roomCode, playerId, onLeave }) {
     onLeave()
   }
 
+  function copyInviteLink() {
+    const link = getInviteLink(roomCode)
+    navigator.clipboard.writeText(link).then(()=>showToast('¡Link copiado!')).catch(()=>showToast(link))
+  }
+
   // ── LOBBY ──────────────────────────────────────────────────────────────────
   if (room.phase==='lobby') return (
     <div style={s.page}>
       <div style={s.roomCard}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:24}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
           <span style={{...s.logoMain,fontSize:36,letterSpacing:8}}>CSDM</span>
           <div style={s.codePill}>Código: <strong style={{color:C.gold,letterSpacing:3}}>{roomCode}</strong></div>
         </div>
-        <div style={s.sectionLabel}>JUGADORES</div>
-        <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:20}}>
+
+        {/* Invite link button */}
+        <button onClick={copyInviteLink} style={s.inviteBtn}>
+          🔗 Copiar link de invitación
+        </button>
+
+        <div style={s.sectionLabel}>JUGADORES EN SALA ({players.length})</div>
+        <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:16}}>
           {players.map(p=>(
             <div key={p.id} style={s.lobbyRow}>
               <span style={{...s.dot,background:p.id===playerId?C.green:C.blue}}/>
@@ -292,32 +397,27 @@ function GameScreen({ roomCode, playerId, onLeave }) {
             </div>
           ))}
         </div>
-        <div style={s.shareBox}>📲 Compartí el código <strong style={{color:C.gold}}>{roomCode}</strong> para que se unan.</div>
 
         {isHost && (
-          <div style={{display:'flex',gap:8,marginBottom:8,marginTop:16}}>
-            <button style={{...s.btnSecondary,flex:1,marginTop:0}} onClick={()=>setScreen('editBlack')}>✏️ Editar preguntas</button>
-            <button style={{...s.btnSecondary,flex:1,marginTop:0}} onClick={()=>setScreen('editCards')}>✏️ Editar respuestas</button>
+          <div style={{display:'flex',gap:8,marginBottom:12}}>
+            <button style={{...s.btnSecondary,flex:1,marginTop:0,padding:'10px 8px',fontSize:13}} onClick={()=>setEditorScreen('black')}>✏️ Preguntas</button>
+            <button style={{...s.btnSecondary,flex:1,marginTop:0,padding:'10px 8px',fontSize:13}} onClick={()=>setEditorScreen('white')}>✏️ Respuestas</button>
           </div>
         )}
 
         {isHost ? (
-          <button
-            style={{...s.btnPrimary, opacity: players.length < 2 ? 0.4 : 1}}
-            onClick={startGame}
-            disabled={players.length < 2}
-          >
-            {players.length < 2 ? 'Esperando más jugadores…' : `¡Empezar con ${players.length} jugadores!`}
+          <button style={{...s.btnPrimary,opacity:players.length<2?.4:1}} onClick={startGame} disabled={players.length<2}>
+            {players.length<2 ? 'Esperando más jugadores…' : `¡Empezar con ${players.length} jugadores!`}
           </button>
         ) : (
           <div style={s.waitBox}>
-            {players.find(p=>p.isHost)?.name} va a iniciar la partida cuando estén todos.<br/>
+            Esperando que <strong style={{color:C.gold}}>{players.find(p=>p.isHost)?.name||'el host'}</strong> inicie.<br/>
             <span style={{fontSize:12,color:C.muted,marginTop:4,display:'block'}}>
-              Si no aparés en la lista, salí y volvé a entrar con el código <strong style={{color:C.gold}}>{roomCode}</strong>
+              ¿No aparecés en la lista? Salí y volvé a entrar.
             </span>
           </div>
         )}
-        <button style={s.btnGhost} onClick={leaveRoom}>Salir</button>
+        <button style={s.btnGhost} onClick={leaveRoom}>Salir de la sala</button>
       </div>
       {toast&&<Toast msg={toast}/>}
     </div>
@@ -333,7 +433,7 @@ function GameScreen({ roomCode, playerId, onLeave }) {
         <div style={s.body}>
           <div style={s.resultBanner}>🏆 RONDA TERMINADA</div>
           <BlackCard text={room.currentBlack}/>
-          {room.roundWinner&&(
+          {room.roundWinner ? (
             <div style={s.winnerBox}>
               <div style={s.sectionLabel}>CARTA MÁS VOTADA</div>
               <div style={s.winnerWhite}>
@@ -349,8 +449,7 @@ function GameScreen({ roomCode, playerId, onLeave }) {
                 ))}
               </div>
             </div>
-          )}
-          {!room.roundWinner&&<div style={s.waitBox}>Nadie votó esta ronda.</div>}
+          ) : <div style={s.waitBox}>Nadie votó esta ronda — sin ganador.</div>}
           <div style={s.scoreboard}>
             <div style={s.sectionLabel}>PUNTAJE</div>
             {sorted.map((p,i)=>(
@@ -384,14 +483,12 @@ function GameScreen({ roomCode, playerId, onLeave }) {
             <span style={{fontSize:10,letterSpacing:3,color:'#555',fontWeight:700}}>CONSIGNA</span>
             <p style={{color:'#fff',fontSize:16,fontWeight:700,lineHeight:1.4,margin:'8px 0 0'}}>{room.currentBlack}</p>
           </div>
-
           <div style={s.voteStatus}>
             {myVote===null
-              ? <span>👇 Votá la respuesta más graciosa (no podés votar la tuya)</span>
-              : <span>✅ Tu voto fue registrado — {votedCount}/{players.length} votaron</span>
+              ? '👇 Votá la respuesta más graciosa (no podés votar la tuya)'
+              : `✅ Tu voto fue registrado — ${votedCount}/${players.length} votaron`
             }
           </div>
-
           <div style={{display:'flex',flexDirection:'column',gap:10}}>
             {allSubs.map(sub=>{
               const isMine=sub.playerId===playerId
@@ -400,36 +497,32 @@ function GameScreen({ roomCode, playerId, onLeave }) {
               return (
                 <div key={sub.playerId} style={{...s.voteRow,...(iVoted?s.voteRowVoted:{}),...(isMine?s.voteRowMine:{})}}>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:12,fontWeight:800,color:isMine?C.gold:C.bluePale,marginBottom:4,letterSpacing:1}}>
+                    <div style={{fontSize:12,fontWeight:800,color:isMine?C.gold:C.bluePale,marginBottom:4,letterSpacing:1,textTransform:'uppercase'}}>
                       {sub.playerName}{isMine?' (vos)':''}
                     </div>
                     <div style={{fontSize:16,fontWeight:600,color:'#1a1a2e',lineHeight:1.4}}>{sub.card}</div>
                   </div>
                   <div style={{flexShrink:0,marginLeft:14}}>
-                    {isMine
-                      ? <div style={s.myCardTag}>Tu carta</div>
-                      : iVoted
-                        ? <div style={s.votedTag}>✓ Votada</div>
-                        : <button onClick={()=>voteCard(sub.playerId)} disabled={!canVote}
-                            style={{...s.voteBtn,opacity:canVote?1:0.35}}>
-                            VOTAR
-                          </button>
+                    {isMine ? <div style={s.myCardTag}>Tu carta</div>
+                    : iVoted ? <div style={s.votedTag}>✓ Votada</div>
+                    : <button onClick={()=>voteCard(sub.playerId)} disabled={!canVote}
+                        style={{...s.voteBtn,opacity:canVote?1:0.35,cursor:canVote?'pointer':'default'}}>
+                        VOTAR
+                      </button>
                     }
                   </div>
                 </div>
               )
             })}
           </div>
-
-          {/* Host always sees advance button */}
-          {isHost&&(
+          {isHost && (
             <button style={{...s.btnPrimary,marginTop:20,background:'linear-gradient(135deg,#7C3AED,#6D28D9)'}} onClick={advanceToResult}>
-              Ver resultados →
+              Ver resultados ({votedCount}/{players.length} votaron) →
             </button>
           )}
           {!isHost&&myVote!==null&&(
             <div style={{color:C.muted,textAlign:'center',fontSize:13,marginTop:12}}>
-              Esperando que el host cierre la votación… ({votedCount}/{players.length} votaron)
+              Esperando que el host cierre la votación…
             </div>
           )}
         </div>
@@ -450,7 +543,7 @@ function GameScreen({ roomCode, playerId, onLeave }) {
           <span style={{fontSize:12,color:C.muted,whiteSpace:'nowrap'}}>{submittedCount}/{players.length} enviadas</span>
         </div>
         <BlackCard text={room.currentBlack}/>
-        {iSubmitted?(
+        {iSubmitted ? (
           <div style={{textAlign:'center'}}>
             <div style={{color:C.green,fontSize:16,fontWeight:700,marginBottom:12}}>✅ Tu carta fue enviada</div>
             <div style={s.sentCard}>{me?.submittedCard}</div>
@@ -462,7 +555,7 @@ function GameScreen({ roomCode, playerId, onLeave }) {
               ))}
             </div>
           </div>
-        ):(
+        ) : (
           <>
             <div style={{fontSize:14,color:C.muted,marginBottom:14}}>
               Tu mano — <span style={{color:C.bluePale}}>seleccioná y editá tu carta antes de enviar</span>
@@ -487,7 +580,7 @@ function GameScreen({ roomCode, playerId, onLeave }) {
 }
 
 // ─── CARD EDITOR ─────────────────────────────────────────────────────────────
-function CardEditor({ roomCode, playerId, type, onBack }) {
+function CardEditor({ roomCode, type, onBack }) {
   const isBlack = type==='black'
   const defaultDeck = isBlack ? BLACK_CARDS : WHITE_CARDS
   const dbKey = isBlack ? 'customBlackDeck' : 'customWhiteDeck'
@@ -504,77 +597,44 @@ function CardEditor({ roomCode, playerId, type, onBack }) {
   async function save() {
     setSaving(true)
     await update(ref(db,`rooms/${roomCode}`),{ [dbKey]: cards })
-    setSaving(false)
-    onBack()
+    setSaving(false); onBack()
   }
 
   function addCard() {
     if (!newCard.trim()) return
-    setCards([...cards, newCard.trim()])
-    setNewCard('')
+    setCards([...cards, newCard.trim()]); setNewCard('')
   }
 
-  function removeCard(i) { setCards(cards.filter((_,idx)=>idx!==i)) }
-
-  function editCard(i, val) { const c=[...cards]; c[i]=val; setCards(c) }
-
-  function reset() { setCards([...defaultDeck]) }
-
-  if (!cards) return <div style={s.page}><div style={{color:C.bluePale,marginTop:80}}>Cargando…</div></div>
+  if (!cards) return <div style={s.page}><div style={{color:C.bluePale,marginTop:80,fontSize:16}}>Cargando…</div></div>
 
   return (
     <div style={s.page}>
       <div style={{width:'100%',maxWidth:620}}>
-        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20}}>
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16}}>
           <button onClick={onBack} style={s.backBtn}>← Volver</button>
-          <h2 style={{color:C.bright,fontSize:18,fontWeight:800,margin:0}}>
-            {isBlack?'✏️ Editar preguntas (cartas negras)':'✏️ Editar respuestas (cartas blancas)'}
+          <h2 style={{color:C.bright,fontSize:17,fontWeight:800,margin:0}}>
+            {isBlack ? '✏️ Preguntas (cartas negras)' : '✏️ Respuestas (cartas blancas)'}
           </h2>
         </div>
-
-        <div style={{color:C.muted,fontSize:13,marginBottom:16}}>
-          {cards.length} cartas en el mazo. Podés editar, eliminar o agregar nuevas.
+        <div style={{color:C.muted,fontSize:13,marginBottom:14}}>{cards.length} cartas en el mazo</div>
+        <div style={{display:'flex',gap:8,marginBottom:16}}>
+          <input style={{...s.input,flex:1}} value={newCard} onChange={e=>setNewCard(e.target.value)}
+            placeholder={isBlack?'Nueva pregunta con ___ para el espacio…':'Nueva respuesta…'}
+            onKeyDown={e=>e.key==='Enter'&&addCard()} />
+          <button style={{...s.joinBtn,padding:'12px 16px'}} onClick={addCard}>+ Agregar</button>
         </div>
-
-        {/* Add new */}
-        <div style={{display:'flex',gap:8,marginBottom:20}}>
-          <input
-            style={{...s.input,flex:1}}
-            placeholder={isBlack?'Nueva pregunta (usá ___ para el espacio)...':'Nueva respuesta...'}
-            value={newCard}
-            onChange={e=>setNewCard(e.target.value)}
-            onKeyDown={e=>e.key==='Enter'&&addCard()}
-          />
-          <button style={{...s.joinBtn,padding:'12px 20px',fontSize:14}} onClick={addCard}>+ Agregar</button>
-        </div>
-
-        {/* Card list */}
-        <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:20,maxHeight:'50vh',overflowY:'auto'}}>
+        <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:16,maxHeight:'55vh',overflowY:'auto'}}>
           {cards.map((card,i)=>(
-            <div key={i} style={{
-              background:isBlack?'#111':'#fff',
-              border:`2px solid ${isBlack?'#333':C.border}`,
-              borderRadius:10, padding:'10px 14px',
-              display:'flex', alignItems:'center', gap:10,
-            }}>
-              <input
-                style={{
-                  flex:1, background:'transparent', border:'none', outline:'none',
-                  color:isBlack?'#fff':'#1a1a2e', fontSize:14, fontWeight:600, fontFamily:'inherit',
-                }}
-                value={card}
-                onChange={e=>editCard(i,e.target.value)}
-              />
-              <button onClick={()=>removeCard(i)} style={{background:'rgba(239,68,68,0.15)',border:'none',color:'#F87171',borderRadius:6,width:28,height:28,cursor:'pointer',fontSize:14,flexShrink:0}}>✕</button>
+            <div key={i} style={{background:isBlack?'#111':'#fff',border:`2px solid ${isBlack?'#333':C.border}`,borderRadius:10,padding:'10px 14px',display:'flex',alignItems:'center',gap:10}}>
+              <input style={{flex:1,background:'transparent',border:'none',outline:'none',color:isBlack?'#fff':'#1a1a2e',fontSize:14,fontWeight:600,fontFamily:'inherit'}}
+                value={card} onChange={e=>{ const c=[...cards]; c[i]=e.target.value; setCards(c) }}/>
+              <button onClick={()=>setCards(cards.filter((_,idx)=>idx!==i))} style={{background:'rgba(239,68,68,0.15)',border:'none',color:'#F87171',borderRadius:6,width:28,height:28,cursor:'pointer',fontSize:14,flexShrink:0}}>✕</button>
             </div>
           ))}
         </div>
-
         <div style={{display:'flex',gap:8}}>
-          <button style={{...s.btnGhost,flex:1,marginTop:0}} onClick={reset}>Restaurar originales</button>
-          <button style={{...s.btnPrimary,flex:2,marginTop:0,opacity:saving?.5:1}} disabled={saving} onClick={save}>
-            {saving?'Guardando...':'Guardar cambios'}
-          </button>
+          <button style={{...s.btnGhost,flex:1,marginTop:0}} onClick={()=>setCards([...defaultDeck])}>Restaurar originales</button>
+          <button style={{...s.btnPrimary,flex:2,marginTop:0,opacity:saving?.5:1}} disabled={saving} onClick={save}>{saving?'Guardando...':'Guardar'}</button>
         </div>
       </div>
     </div>
@@ -592,7 +652,7 @@ function HandCard({ text, selected, onSelect, onEdit }) {
         ? <textarea autoFocus style={s.textarea} value={val} onChange={e=>setVal(e.target.value)} onBlur={()=>{setEditing(false);onEdit(val)}} onClick={e=>e.stopPropagation()} rows={3}/>
         : <p style={{color:'#1a1a2e',fontSize:14,fontWeight:600,lineHeight:1.4,margin:0,flex:1}}>{val}</p>
       }
-      <button style={s.editBtn} onClick={e=>{e.stopPropagation();setEditing(!editing)}}>{editing?'✓':' ✏️'}</button>
+      <button style={s.editBtn} onClick={e=>{e.stopPropagation();setEditing(!editing)}}>{editing?'✓':'✏️'}</button>
       {selected&&!editing&&<div style={s.selBadge}>✓ Seleccionada</div>}
     </div>
   )
@@ -614,7 +674,6 @@ function GameHeader({ players, playerId, roomCode }) {
     </div>
   )
 }
-
 function BlackCard({ text }) {
   return (
     <div style={s.blackCard}>
@@ -623,7 +682,6 @@ function BlackCard({ text }) {
     </div>
   )
 }
-
 function Toast({ msg }) {
   return <div style={{position:'fixed',bottom:24,left:'50%',transform:'translateX(-50%)',background:C.blue,color:'#fff',padding:'12px 24px',borderRadius:30,fontSize:14,fontWeight:700,boxShadow:'0 8px 32px rgba(0,0,0,0.4)',zIndex:999,whiteSpace:'nowrap',pointerEvents:'none'}}>{msg}</div>
 }
@@ -632,7 +690,7 @@ function Toast({ msg }) {
 const s = {
   page:{minHeight:'100vh',background:`linear-gradient(160deg,${C.bg} 0%,${C.bgDeep} 100%)`,display:'flex',flexDirection:'column',alignItems:'center',fontFamily:"'Inter','Segoe UI',sans-serif",color:C.text,padding:'20px 16px 60px'},
   homeCard:{background:C.panel,border:`1px solid ${C.border}`,borderRadius:20,padding:'40px 32px',width:'100%',maxWidth:420,boxShadow:'0 32px 80px rgba(0,0,0,0.5)',marginTop:40},
-  roomCard:{background:C.panel,border:`1px solid ${C.border}`,borderRadius:20,padding:'32px 28px',width:'100%',maxWidth:440,boxShadow:'0 32px 80px rgba(0,0,0,0.5)',marginTop:20},
+  roomCard:{background:C.panel,border:`1px solid ${C.border}`,borderRadius:20,padding:'28px 24px',width:'100%',maxWidth:460,boxShadow:'0 32px 80px rgba(0,0,0,0.5)',marginTop:20},
   logoMain:{display:'block',fontSize:72,fontWeight:900,fontFamily:"'Georgia','Times New Roman',serif",color:'#fff',letterSpacing:10,lineHeight:1,textShadow:`0 0 60px ${C.blue}88`},
   logoSub:{display:'block',fontSize:11,letterSpacing:4,color:C.bluePale,marginTop:6,fontWeight:600},
   tabs:{display:'flex',gap:6,margin:'14px 0',background:'rgba(0,0,0,0.3)',borderRadius:10,padding:4},
@@ -644,13 +702,13 @@ const s = {
   btnSecondary:{width:'100%',background:'transparent',border:`1px solid ${C.border}`,color:C.bluePale,borderRadius:12,padding:13,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',marginTop:8},
   btnGhost:{width:'100%',background:'transparent',border:`1px solid ${C.border}`,color:C.muted,borderRadius:10,padding:12,fontSize:14,cursor:'pointer',fontFamily:'inherit',marginTop:10},
   backBtn:{background:'transparent',border:`1px solid ${C.border}`,color:C.bluePale,borderRadius:8,padding:'8px 14px',fontSize:14,cursor:'pointer',fontFamily:'inherit',fontWeight:600,flexShrink:0},
+  inviteBtn:{width:'100%',background:`linear-gradient(135deg,${C.green}22,${C.green}11)`,border:`1px solid ${C.green}55`,color:C.green,borderRadius:10,padding:'12px 16px',fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',marginBottom:18,letterSpacing:0.5},
   codePill:{background:C.blueFaint,border:`1px solid ${C.border}`,borderRadius:8,padding:'6px 14px',fontSize:14,color:C.bluePale},
-  sectionLabel:{fontSize:11,letterSpacing:3,color:C.muted,fontWeight:700,marginBottom:12},
+  sectionLabel:{fontSize:11,letterSpacing:3,color:C.muted,fontWeight:700,marginBottom:10},
   lobbyRow:{display:'flex',alignItems:'center',gap:10,background:'rgba(255,255,255,0.04)',border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 14px'},
   dot:{width:8,height:8,borderRadius:'50%',flexShrink:0},
   youBadge:{fontSize:11,fontWeight:700,color:C.blue,background:C.blueFaint,padding:'2px 8px',borderRadius:20},
-  shareBox:{background:'rgba(251,191,36,0.08)',border:`1px solid ${C.gold}33`,borderRadius:12,padding:14,fontSize:14,color:C.text,lineHeight:1.6,textAlign:'center',marginBottom:8},
-  waitBox:{background:C.blueFaint,border:`1px solid ${C.border}`,borderRadius:10,padding:14,color:C.bluePale,textAlign:'center',fontSize:14,marginTop:16},
+  waitBox:{background:C.blueFaint,border:`1px solid ${C.border}`,borderRadius:10,padding:14,color:C.bluePale,textAlign:'center',fontSize:14,marginTop:12,lineHeight:1.6},
   emptyBox:{background:'rgba(255,255,255,0.04)',border:`1px solid ${C.border}`,borderRadius:10,padding:20,textAlign:'center',color:C.muted,fontSize:14,lineHeight:1.8},
   publicRow:{display:'flex',justifyContent:'space-between',alignItems:'center',background:'rgba(255,255,255,0.04)',border:`1px solid ${C.border}`,borderRadius:10,padding:'12px 14px'},
   joinBtn:{background:C.blue,border:'none',color:'#fff',borderRadius:8,padding:'8px 16px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700},
@@ -660,10 +718,10 @@ const s = {
   track:{flex:1,height:4,background:'rgba(255,255,255,0.08)',borderRadius:2,overflow:'hidden'},
   fill:{height:'100%',background:`linear-gradient(90deg,${C.blue},${C.blueHover})`,borderRadius:2,transition:'width 0.5s ease'},
   blackCard:{background:'#080808',border:'3px solid #1a1a2e',borderRadius:16,padding:'26px 24px',marginBottom:20,boxShadow:'0 12px 40px rgba(0,0,0,0.6)'},
-  blackCardSmall:{background:'#080808',border:'2px solid #1a1a2e',borderRadius:12,padding:'16px 20px',marginBottom:14,boxShadow:'0 8px 24px rgba(0,0,0,0.5)'},
+  blackCardSmall:{background:'#080808',border:'2px solid #1a1a2e',borderRadius:12,padding:'16px 20px',marginBottom:14},
   voteStatus:{background:C.blueFaint,border:`1px solid ${C.border}`,borderRadius:10,padding:'12px 16px',fontSize:14,color:C.bluePale,textAlign:'center',marginBottom:14,fontWeight:600},
-  voteRow:{background:'#fff',borderRadius:14,padding:'14px 16px',display:'flex',alignItems:'center',border:'3px solid transparent',boxShadow:'0 4px 16px rgba(0,0,0,0.2)',transition:'all 0.2s'},
-  voteRowVoted:{border:`3px solid ${C.blue}`,boxShadow:`0 6px 24px ${C.blue}44`,background:'#f0f7ff'},
+  voteRow:{background:'#fff',borderRadius:14,padding:'14px 16px',display:'flex',alignItems:'center',border:'3px solid transparent',boxShadow:'0 4px 16px rgba(0,0,0,0.2)',transition:'border 0.2s'},
+  voteRowVoted:{border:`3px solid ${C.blue}`,background:'#f0f7ff'},
   voteRowMine:{border:`3px solid ${C.gold}55`,background:'#fffbf0'},
   voteBtn:{background:C.blue,border:'none',color:'#fff',borderRadius:10,padding:'10px 18px',fontSize:14,fontWeight:900,cursor:'pointer',fontFamily:'inherit',letterSpacing:1,boxShadow:`0 4px 16px ${C.blue}55`,minWidth:80},
   myCardTag:{background:C.gold,color:'#000',fontSize:11,fontWeight:800,padding:'6px 10px',borderRadius:8,letterSpacing:1,whiteSpace:'nowrap'},
