@@ -69,17 +69,40 @@ function HomeScreen({ playerId, onEnter }) {
     const jc = (codeOverride||code).trim().toUpperCase()
     if (!jc) { setError('Ingresá el código'); return }
     setLoading(true); setError('')
-    const snap = await get(ref(db,`rooms/${jc}`))
-    if (!snap.exists())         { setError('Sala no encontrada'); setLoading(false); return }
-    const room = snap.val()
-    if (room.phase!=='lobby')   { setError('La partida ya comenzó'); setLoading(false); return }
-    if (Object.keys(room.players||{}).length>=12) { setError('Sala llena'); setLoading(false); return }
-    if (room.players?.[playerId]) { setLoading(false); onEnter(jc); return }
-    const wd = [...(room.whiteDeck||[])]; const hand = wd.splice(0,10)
-    await update(ref(db,`rooms/${jc}`), { whiteDeck:wd })
-    await set(ref(db,`rooms/${jc}/players/${playerId}`), { id:playerId, name:name.trim(), hand, score:0, submitted:false, submittedCard:null, vote:null, isHost:false })
-    if (room.isPublic) await update(ref(db,`public_rooms/${jc}`), { playerCount:Object.keys(room.players||{}).length+1 })
-    setLoading(false); onEnter(jc)
+    try {
+      const snap = await get(ref(db,`rooms/${jc}`))
+      if (!snap.exists())       { setError('Sala no encontrada'); setLoading(false); return }
+      const room = snap.val()
+      if (room.phase!=='lobby') { setError('La partida ya comenzó'); setLoading(false); return }
+      const currentPlayers = room.players || {}
+      if (Object.keys(currentPlayers).length >= 12) { setError('Sala llena'); setLoading(false); return }
+
+      // Always write the player (overwrite if already exists with stale data)
+      const wd = [...(room.whiteDeck||[])]
+      const hand = wd.length >= 10 ? wd.splice(0,10) : [...WHITE_CARDS.slice(0,10)]
+      const existingPlayer = currentPlayers[playerId]
+      const playerData = {
+        id: playerId,
+        name: name.trim(),
+        hand: existingPlayer?.hand || hand,
+        score: existingPlayer?.score || 0,
+        submitted: false,
+        submittedCard: null,
+        vote: null,
+        isHost: false,
+      }
+      // Write player and update deck atomically
+      const updates = { [`players/${playerId}`]: playerData }
+      if (!existingPlayer) updates.whiteDeck = wd
+      await update(ref(db,`rooms/${jc}`), updates)
+      if (room.isPublic && !existingPlayer) {
+        await update(ref(db,`public_rooms/${jc}`), { playerCount: Object.keys(currentPlayers).length + 1 })
+      }
+      setLoading(false); onEnter(jc)
+    } catch(e) {
+      setError('Error al conectar. Intentá de nuevo.')
+      setLoading(false)
+    }
   }
 
   return (
@@ -166,7 +189,7 @@ function GameScreen({ roomCode, playerId, onLeave }) {
 
   async function startGame() {
     const snap = await get(ref(db,`rooms/${roomCode}`)); const r = snap.val()
-    if (Object.keys(r.players).length < 3) return
+    if (Object.keys(r.players).length < 2) return
     // Use room's custom decks if set, otherwise defaults
     const bd = Array.isArray(r.customBlackDeck) && r.customBlackDeck.length>0 ? shuffle([...r.customBlackDeck]) : shuffle(BLACK_CARDS)
     const currentBlack = bd[0]
@@ -278,12 +301,22 @@ function GameScreen({ roomCode, playerId, onLeave }) {
           </div>
         )}
 
-        {players.length<3
-          ? <div style={s.waitBox}>Esperando jugadores… (mínimo 3, hay {players.length})</div>
-          : isHost
-            ? <button style={s.btnPrimary} onClick={startGame}>¡Empezar partida!</button>
-            : <div style={s.waitBox}>Esperando que {players.find(p=>p.isHost)?.name} inicie…</div>
-        }
+        {isHost ? (
+          <button
+            style={{...s.btnPrimary, opacity: players.length < 2 ? 0.4 : 1}}
+            onClick={startGame}
+            disabled={players.length < 2}
+          >
+            {players.length < 2 ? 'Esperando más jugadores…' : `¡Empezar con ${players.length} jugadores!`}
+          </button>
+        ) : (
+          <div style={s.waitBox}>
+            {players.find(p=>p.isHost)?.name} va a iniciar la partida cuando estén todos.<br/>
+            <span style={{fontSize:12,color:C.muted,marginTop:4,display:'block'}}>
+              Si no aparés en la lista, salí y volvé a entrar con el código <strong style={{color:C.gold}}>{roomCode}</strong>
+            </span>
+          </div>
+        )}
         <button style={s.btnGhost} onClick={leaveRoom}>Salir</button>
       </div>
       {toast&&<Toast msg={toast}/>}
