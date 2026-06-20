@@ -4,6 +4,8 @@ import { C } from '../theme'
 const STORAGE_KEY = 'afterlaburo_consignas_v1'
 
 const DEFAULT_CONSIGNAS = [
+  'Cosas que aprendiste por el Maxo.',
+  'Anécdotas de pueblo.',
   'Contá la vez que más la cagaste en un laburo.',
   'La excusa más boluda que diste para faltar al trabajo.',
   'Tu jefe o jefa más particular: contá una anécdota.',

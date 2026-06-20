@@ -99,6 +99,13 @@ function MenuScreen({ onSelect }) {
           <span style={m.cardDesc}>Leé una consigna, contá tu historia en voz alta y sumá puntos al mejor relato</span>
           <span style={m.cardCta}>Jugar →</span>
         </button>
+
+        <button style={m.card} onClick={() => { window.location.href = '/games/90segundos.html' }}>
+          <span style={m.cardIcon}>⏱️</span>
+          <span style={m.cardTitle}>90 SEG · GO FOR</span>
+          <span style={m.cardDesc}>Respondé la mayor cantidad de preguntas posibles en 90 segundos, con modo picante 🌶</span>
+          <span style={m.cardCta}>Jugar →</span>
+        </button>
       </div>
 
       <div style={m.versionTag}>{APP_VERSION}</div>
