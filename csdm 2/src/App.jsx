@@ -41,11 +41,11 @@ function WelcomeScreen({ onContinue }) {
       <div style={w.glowA} />
       <div style={w.glowB} />
       <div style={w.content}>
-        <span style={w.eyebrow}>BIENVENIDO A</span>
+        <span style={w.eyebrow}>BIENVENIDO A LA</span>
         <h1 style={w.title}>
-          <span style={{ ...w.titleWord, animationDelay: '0.05s' }}>AFTER</span>
-          <span style={w.dash}>-</span>
-          <span style={{ ...w.titleWord, animationDelay: '0.25s' }}>LABURO</span>
+          <span style={{ ...w.titleWord, animationDelay: '0.05s' }}>HORA</span>{' '}
+          <span style={{ ...w.titleWord, animationDelay: '0.2s' }}>DEL</span>{' '}
+          <span style={{ ...w.titleWord, color: C.gold, textShadow: `0 0 50px ${C.gold}aa, 0 0 100px ${C.gold}55`, animationDelay: '0.35s' }}>JIJEO</span>
         </h1>
         <div style={w.underline} />
         <p style={{ ...w.tap, opacity: ready ? 1 : 0 }}>Tocá la pantalla para entrar</p>
@@ -70,7 +70,6 @@ const w = {
   eyebrow: { display: 'block', fontSize: 14, letterSpacing: 8, color: C.bluePale, fontWeight: 700, marginBottom: 14 },
   title: { margin: 0, fontFamily: "'Georgia','Times New Roman',serif", fontWeight: 900, lineHeight: 1.05, letterSpacing: 2 },
   titleWord: { display: 'inline-block', fontSize: 'clamp(40px, 11vw, 84px)', color: '#fff', textShadow: `0 0 50px ${C.blue}aa, 0 0 100px ${C.blue}55`, animation: 'alWelcomeWord 0.7s ease both' },
-  dash: { display: 'inline-block', fontSize: 'clamp(40px, 11vw, 84px)', color: C.gold },
   underline: { width: 120, height: 4, background: `linear-gradient(90deg, transparent, ${C.gold}, transparent)`, margin: '22px auto 0' },
   tap: { marginTop: 28, fontSize: 13, letterSpacing: 3, color: C.bluePale, fontWeight: 600, transition: 'opacity 0.5s ease', animation: 'alWelcomePulse 1.8s ease-in-out infinite' },
   versionTag: { position: 'absolute', bottom: 18, fontSize: 11, letterSpacing: 2, color: C.muted },
@@ -81,7 +80,7 @@ function MenuScreen({ onSelect }) {
   return (
     <div style={m.page}>
       <div style={{ textAlign: 'center', marginTop: 10, marginBottom: 30 }}>
-        <span style={m.logo}>AFTER-LABURO</span>
+        <span style={m.logo}>HORA DEL JIJEO</span>
         <span style={m.logoSub}>ELEGÍ A QUÉ JUGAR</span>
       </div>
 
@@ -102,7 +101,7 @@ function MenuScreen({ onSelect }) {
 
         <button style={m.card} onClick={() => { window.location.href = '/games/90segundos.html' }}>
           <span style={m.cardIcon}>⏱️</span>
-          <span style={m.cardTitle}>90 SEG · GO FOR</span>
+          <span style={m.cardTitle}>90 SEGUNDOS DE JIJEO</span>
           <span style={m.cardDesc}>Respondé la mayor cantidad de preguntas posibles en 90 segundos, con modo picante 🌶</span>
           <span style={m.cardCta}>Jugar →</span>
         </button>
