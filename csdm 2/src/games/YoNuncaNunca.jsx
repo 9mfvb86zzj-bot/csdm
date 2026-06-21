@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { C, wallpaper } from '../theme'
+import { handleShine, playPop } from '../effects'
 
 const PROMPTS = [
   { text: 'Nunca nunca me quedé dormido en clase o en el trabajo', cat: 'clasico' },
@@ -73,6 +74,7 @@ export default function YoNuncaNuncaGame({ onExit }) {
   function next() {
     if (pool.current.length === 0) pool.current = shuffledIndexes(active)
     const idx = pool.current.pop()
+    playPop()
     setSwap(true)
     setTimeout(() => {
       setCurrent(PROMPTS[idx].text)
@@ -83,8 +85,8 @@ export default function YoNuncaNuncaGame({ onExit }) {
 
   return (
     <div style={s.page}>
-      <div style={s.card}>
-        <button style={s.backBtn} onClick={onExit}>← Menú</button>
+      <div style={s.card} className="glass-shine" onPointerMove={handleShine}>
+        <button style={s.backBtn} className="press-fx" onClick={onExit}>← Menú</button>
 
         <div style={{ textAlign: 'center', margin: '14px 0 20px' }}>
           <span style={s.logo}>YO NUNCA NUNCA</span>
@@ -95,6 +97,7 @@ export default function YoNuncaNuncaGame({ onExit }) {
           {CATS.map(c => (
             <button
               key={c.id}
+              className="press-fx"
               onClick={() => toggleCat(c.id)}
               style={{ ...s.chip, ...(active.has(c.id) ? s.chipOn : {}) }}
             >
@@ -111,7 +114,7 @@ export default function YoNuncaNuncaGame({ onExit }) {
 
         <p style={s.counter}>{round > 0 ? `Ronda ${round}` : ' '}</p>
 
-        <button style={s.nextBtn} onClick={next}>Siguiente consigna →</button>
+        <button style={s.nextBtn} className="press-fx" onClick={next}>Siguiente consigna →</button>
       </div>
     </div>
   )

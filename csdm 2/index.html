@@ -9,7 +9,25 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { background: #0D1B4B; font-family: 'Inter', sans-serif; }
+      body { background: #050509; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif; }
+
+      /* Liquid Glass microinteractions — shared across every screen */
+      .glass-shine { position: relative; overflow: hidden; }
+      .glass-shine::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: radial-gradient(220px circle at var(--mx, 30%) var(--my, 14%), rgba(255,255,255,0.38), transparent 60%);
+        mix-blend-mode: overlay;
+        pointer-events: none;
+        transition: background 0.15s cubic-bezier(0.4,0,0.2,1);
+      }
+      .press-fx { transition: transform 0.15s cubic-bezier(0.4,0,0.2,1); }
+      .press-fx:active { transform: scale(0.97); }
+      @keyframes alConfetti {
+        to { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) rotate(360deg); opacity: 0; }
+      }
     </style>
   </head>
   <body>

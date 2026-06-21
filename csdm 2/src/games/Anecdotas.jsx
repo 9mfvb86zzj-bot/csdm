@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { C, wallpaper } from '../theme'
+import { handleShine, playPop, playWin, burstConfettiFromEvent } from '../effects'
 
 const STORAGE_KEY = 'afterlaburo_consignas_v1'
 
@@ -70,6 +71,7 @@ export default function AnecdotasGame({ onExit }) {
     let p = fromPool
     if (!p || p.length === 0) p = shuffle(consignas)
     const [next, ...rest] = p
+    playPop()
     setCurrent(next)
     setPool(rest)
   }
@@ -84,9 +86,11 @@ export default function AnecdotasGame({ onExit }) {
     setScreen('play')
   }
 
-  function awardPoint(id) {
+  function awardPoint(id, e) {
     setParticipants(p => p.map(x => x.id === id ? { ...x, score: x.score + 1 } : x))
     setWinnerFlash(id)
+    playWin()
+    if (e) burstConfettiFromEvent(e)
     setTimeout(() => {
       setWinnerFlash(null)
       setRound(r => r + 1)
@@ -116,12 +120,12 @@ export default function AnecdotasGame({ onExit }) {
         <style>{keyframes}</style>
         <div style={st.playWrap}>
           <div style={st.topRow}>
-            <button style={st.backBtn} onClick={() => setScreen('setup')}>← Jugadores</button>
+            <button style={st.backBtn} className="press-fx" onClick={() => setScreen('setup')}>← Jugadores</button>
             <span style={st.roundTag}>Ronda {round}</span>
-            <button style={st.backBtn} onClick={() => setScreen('editor')}>✎ Consignas</button>
+            <button style={st.backBtn} className="press-fx" onClick={() => setScreen('editor')}>✎ Consignas</button>
           </div>
 
-          <div style={st.consignaCard}>
+          <div style={st.consignaCard} className="glass-shine" onPointerMove={handleShine}>
             <div style={st.consignaLabel}>CONSIGNA</div>
             <div style={st.consignaText}>{current}</div>
           </div>
@@ -132,7 +136,8 @@ export default function AnecdotasGame({ onExit }) {
             {participants.map(pl => (
               <button
                 key={pl.id}
-                onClick={() => awardPoint(pl.id)}
+                className="press-fx"
+                onClick={(e) => awardPoint(pl.id, e)}
                 style={{
                   ...st.participantBtn,
                   ...(winnerFlash === pl.id ? st.participantBtnWin : {})
@@ -144,7 +149,7 @@ export default function AnecdotasGame({ onExit }) {
             ))}
           </div>
 
-          <button style={st.skipBtn} onClick={skipConsigna}>Saltear esta consigna →</button>
+          <button className="press-fx" style={st.skipBtn} onClick={skipConsigna}>Saltear esta consigna →</button>
 
           <div style={st.scoreboard}>
             <div style={st.sectionLabel}>TABLA DE POSICIONES</div>
@@ -165,8 +170,8 @@ export default function AnecdotasGame({ onExit }) {
   return (
     <div style={st.page}>
       <style>{keyframes}</style>
-      <div style={st.setupCard}>
-        <button style={{ ...st.backBtn, marginBottom: 16 }} onClick={onExit}>← Menú</button>
+      <div style={st.setupCard} className="glass-shine" onPointerMove={handleShine}>
+        <button style={{ ...st.backBtn, marginBottom: 16 }} className="press-fx" onClick={onExit}>← Menú</button>
         <div style={{ textAlign: 'center', marginBottom: 6 }}>
           <span style={st.logo}>ANÉCDOTAS</span>
           <span style={st.logoSub}>IRL · CONTÁ Y SUMÁ PUNTOS</span>
@@ -184,7 +189,7 @@ export default function AnecdotasGame({ onExit }) {
             onKeyDown={e => e.key === 'Enter' && addParticipant()}
             maxLength={20}
           />
-          <button style={st.addBtn} onClick={addParticipant}>+</button>
+          <button style={st.addBtn} className="press-fx" onClick={addParticipant}>+</button>
         </div>
 
         {participants.length === 0 ? (
@@ -194,7 +199,7 @@ export default function AnecdotasGame({ onExit }) {
             {participants.map(p => (
               <div key={p.id} style={st.participantRow}>
                 <span>{p.name}</span>
-                <button style={st.removeBtn} onClick={() => removeParticipant(p.id)}>✕</button>
+                <button className="press-fx" style={st.removeBtn} onClick={() => removeParticipant(p.id)}>✕</button>
               </div>
             ))}
           </div>
@@ -202,13 +207,14 @@ export default function AnecdotasGame({ onExit }) {
 
         <button
           style={{ ...st.btnPrimary, opacity: participants.length < 2 ? 0.5 : 1 }}
+          className="press-fx"
           disabled={participants.length < 2}
           onClick={startGame}
         >
           {participants.length < 2 ? 'Sumá al menos 2 jugadores' : '🎤 Empezar'}
         </button>
 
-        <button style={st.btnSecondary} onClick={() => setScreen('editor')}>✎ Editar consignas ({consignas.length})</button>
+        <button style={st.btnSecondary} className="press-fx" onClick={() => setScreen('editor')}>✎ Editar consignas ({consignas.length})</button>
       </div>
     </div>
   )
@@ -245,7 +251,7 @@ function ConsignaEditor({ consignas, setConsignas, onBack }) {
   return (
     <div style={st.page}>
       <div style={st.setupCard}>
-        <button style={{ ...st.backBtn, marginBottom: 16 }} onClick={onBack}>← Volver</button>
+        <button className="press-fx" style={{ ...st.backBtn, marginBottom: 16 }} onClick={onBack}>← Volver</button>
         <div style={{ textAlign: 'center', marginBottom: 16 }}>
           <span style={st.logo}>CONSIGNAS</span>
           <span style={st.logoSub}>EDITÁ EL MAZO DE TEMAS</span>
@@ -260,7 +266,7 @@ function ConsignaEditor({ consignas, setConsignas, onBack }) {
             onKeyDown={e => e.key === 'Enter' && addConsigna()}
             maxLength={140}
           />
-          <button style={st.addBtn} onClick={addConsigna}>+</button>
+          <button className="press-fx" style={st.addBtn} onClick={addConsigna}>+</button>
         </div>
 
         <div style={st.consignaList}>
@@ -278,12 +284,12 @@ function ConsignaEditor({ consignas, setConsignas, onBack }) {
               ) : (
                 <span style={{ flex: 1, fontSize: 13.5 }} onClick={() => startEdit(idx, c)}>{c}</span>
               )}
-              <button style={st.removeBtn} onClick={() => deleteConsigna(idx)}>✕</button>
+              <button className="press-fx" style={st.removeBtn} onClick={() => deleteConsigna(idx)}>✕</button>
             </div>
           ))}
         </div>
 
-        <button style={st.btnSecondary} onClick={restoreDefaults}>↺ Restaurar consignas originales</button>
+        <button className="press-fx" style={st.btnSecondary} onClick={restoreDefaults}>↺ Restaurar consignas originales</button>
       </div>
     </div>
   )

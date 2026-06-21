@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { C, wallpaper } from './theme'
+import { handleShine, playPop } from './effects'
 import CSDMGame from './games/CSDM'
 import AnecdotasGame from './games/Anecdotas'
 import YoNuncaNuncaGame from './games/YoNuncaNunca'
@@ -84,28 +85,28 @@ function MenuScreen({ onSelect }) {
       </div>
 
       <div style={m.cardsWrap}>
-        <button style={m.card} onClick={() => onSelect('csdm')}>
+        <button style={m.card} className="glass-shine press-fx" onPointerMove={handleShine} onClick={() => { playPop(); onSelect('csdm') }}>
           <span style={m.cardIcon}>🃏</span>
           <span style={m.cardTitle}>CSDM</span>
           <span style={m.cardDesc}>Hasta dónde te animás · juego de cartas online, +18, 3 a 12 jugadores</span>
           <span style={m.cardCta}>Jugar →</span>
         </button>
 
-        <button style={m.card} onClick={() => onSelect('anecdotas')}>
+        <button style={m.card} className="glass-shine press-fx" onPointerMove={handleShine} onClick={() => { playPop(); onSelect('anecdotas') }}>
           <span style={m.cardIcon}>🎤</span>
           <span style={m.cardTitle}>ANÉCDOTAS IRL</span>
           <span style={m.cardDesc}>Leé una consigna, contá tu historia en voz alta y sumá puntos al mejor relato</span>
           <span style={m.cardCta}>Jugar →</span>
         </button>
 
-        <button style={m.card} onClick={() => onSelect('nuncanunca')}>
+        <button style={m.card} className="glass-shine press-fx" onPointerMove={handleShine} onClick={() => { playPop(); onSelect('nuncanunca') }}>
           <span style={m.cardIcon}>🥂</span>
           <span style={m.cardTitle}>YO NUNCA NUNCA</span>
           <span style={m.cardDesc}>Consignas al azar por categoría · clásico, fiesta y picante, sin repetir</span>
           <span style={m.cardCta}>Jugar →</span>
         </button>
 
-        <button style={m.card} onClick={() => { window.location.href = '/games/90segundos.html' }}>
+        <button style={m.card} className="glass-shine press-fx" onPointerMove={handleShine} onClick={() => { playPop(); window.location.href = '/games/90segundos.html' }}>
           <span style={m.cardIcon}>⏱️</span>
           <span style={m.cardTitle}>90 SEGUNDOS DE JIJEO</span>
           <span style={m.cardDesc}>Respondé la mayor cantidad de preguntas posibles en 90 segundos, con modo picante 🌶</span>

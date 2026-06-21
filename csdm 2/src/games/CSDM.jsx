@@ -3,6 +3,7 @@ import { ref, set, get, update, onValue, off } from 'firebase/database'
 import { db } from '../firebase'
 import { BLACK_CARDS, WHITE_CARDS, shuffle } from '../cards'
 import { C, wallpaper } from '../theme'
+import { handleShine, playPop, playWin, burstConfettiFromRect } from '../effects'
 
 const VERSION = 'v6.0'
 
@@ -103,7 +104,7 @@ function JoinFromLink({ roomCode, playerId, onEnter, onCancel }) {
 
   return (
     <div style={s.page}>
-      <div style={s.homeCard}>
+      <div style={s.homeCard} className="glass-shine" onPointerMove={handleShine}>
         <div style={{textAlign:'center', marginBottom:20}}>
           <span style={s.logoMain}>CSDM</span>
         </div>
@@ -121,12 +122,12 @@ function JoinFromLink({ roomCode, playerId, onEnter, onCancel }) {
               onKeyDown={e=>e.key==='Enter'&&join()}
               maxLength={20} autoFocus />
             {error && <div style={s.errorBox}>{error}</div>}
-            <button style={{...s.btnPrimary, opacity:loading?.5:1}} disabled={loading} onClick={join}>
+            <button className="press-fx" style={{...s.btnPrimary, opacity:loading?.5:1}} disabled={loading} onClick={join}>
               {loading ? 'Entrando...' : '¡Unirme a la partida!'}
             </button>
           </>
         )}
-        <button style={s.btnGhost} onClick={onCancel}>Cancelar</button>
+        <button className="press-fx" style={s.btnGhost} onClick={onCancel}>Cancelar</button>
       </div>
     </div>
   )
@@ -193,9 +194,9 @@ function HomeScreen({ playerId, onEnter, onExit }) {
 
   return (
     <div style={s.page}>
-      <div style={s.homeCard}>
+      <div style={s.homeCard} className="glass-shine" onPointerMove={handleShine}>
         {onExit && (
-          <button style={{...s.backBtn, marginBottom:16}} onClick={onExit}>← Menú</button>
+          <button className="press-fx" style={{...s.backBtn, marginBottom:16}} onClick={onExit}>← Menú</button>
         )}
         <div style={{textAlign:'center',marginBottom:8}}>
           <span style={s.logoMain}>CSDM</span>
@@ -205,18 +206,18 @@ function HomeScreen({ playerId, onEnter, onExit }) {
         <input style={s.input} placeholder="Tu nombre..." value={name} onChange={e=>{setName(e.target.value);setError('')}} maxLength={20}/>
         <div style={s.tabs}>
           {['create','join','public'].map(m=>(
-            <button key={m} style={mode===m?s.tabOn:s.tabOff} onClick={()=>setMode(m)}>
+            <button className="press-fx" key={m} style={mode===m?s.tabOn:s.tabOff} onClick={()=>setMode(m)}>
               {m==='create'?'+ Crear':m==='join'?'# Código':'🌐 Públicas'}
             </button>
           ))}
         </div>
         {mode==='create' && <>
-          <button style={{...s.btnPrimary,opacity:loading?.5:1}} disabled={loading} onClick={()=>handleCreate(false)}>Crear sala privada</button>
-          <button style={{...s.btnSecondary,opacity:loading?.5:1}} disabled={loading} onClick={()=>handleCreate(true)}>🌐 Crear sala pública</button>
+          <button className="press-fx" style={{...s.btnPrimary,opacity:loading?.5:1}} disabled={loading} onClick={()=>handleCreate(false)}>Crear sala privada</button>
+          <button className="press-fx" style={{...s.btnSecondary,opacity:loading?.5:1}} disabled={loading} onClick={()=>handleCreate(true)}>🌐 Crear sala pública</button>
         </>}
         {mode==='join' && <>
           <input style={{...s.input,marginTop:10,letterSpacing:4,textTransform:'uppercase'}} placeholder="Código..." value={code} onChange={e=>setCode(e.target.value.toUpperCase())} onKeyDown={e=>e.key==='Enter'&&handleJoin()} maxLength={5}/>
-          <button style={{...s.btnPrimary,opacity:loading?.5:1}} disabled={loading} onClick={()=>handleJoin()}>{loading?'Entrando...':'Entrar'}</button>
+          <button className="press-fx" style={{...s.btnPrimary,opacity:loading?.5:1}} disabled={loading} onClick={()=>handleJoin()}>{loading?'Entrando...':'Entrar'}</button>
         </>}
         {mode==='public' && (
           <div style={{display:'flex',flexDirection:'column',gap:8,marginTop:4}}>
@@ -228,7 +229,7 @@ function HomeScreen({ playerId, onEnter, onExit }) {
                     <div style={{fontSize:14,color:C.bright,fontWeight:700}}>Sala de {r.host}</div>
                     <div style={{fontSize:12,color:C.muted}}>{r.playerCount} jugador{r.playerCount!==1?'es':''} · esperando</div>
                   </div>
-                  <button style={s.joinBtn} onClick={()=>handleJoin(r.code)}>Unirse</button>
+                  <button className="press-fx" style={s.joinBtn} onClick={()=>handleJoin(r.code)}>Unirse</button>
                 </div>
               ))
             }
@@ -247,6 +248,8 @@ function GameScreen({ roomCode, playerId, onLeave }) {
   const [toast, setToast]             = useState('')
   const [selectedIdx, setSelectedIdx] = useState(null)
   const [editorScreen, setEditorScreen] = useState(null) // null | 'white' | 'black'
+  const winnerBoxRef = useRef(null)
+  const prevPhase = useRef(null)
 
   const showToast = msg => { setToast(msg); setTimeout(()=>setToast(''),2500) }
 
@@ -260,6 +263,15 @@ function GameScreen({ roomCode, playerId, onLeave }) {
     })
     return () => off(r)
   }, [roomCode])
+
+  // Fires once per round, for every player, the moment the result phase appears
+  useEffect(() => {
+    if (room?.phase === 'result' && room?.roundWinner && prevPhase.current !== 'result') {
+      playWin()
+      if (winnerBoxRef.current) burstConfettiFromRect(winnerBoxRef.current.getBoundingClientRect())
+    }
+    prevPhase.current = room?.phase
+  }, [room?.phase, room?.roundWinner])
 
   if (!room) return (
     <div style={s.page}>
@@ -312,7 +324,7 @@ function GameScreen({ roomCode, playerId, onLeave }) {
       updates.phase='judging'
     }
     await update(ref(db,`rooms/${roomCode}`), updates)
-    setSelectedIdx(null); showToast('Carta enviada ✓')
+    setSelectedIdx(null); playPop(); showToast('Carta enviada ✓')
   }
 
   async function voteCard(targetPlayerId) {
@@ -321,7 +333,7 @@ function GameScreen({ roomCode, playerId, onLeave }) {
       [`players/${playerId}/vote`]: targetPlayerId,
       [`votes/${targetPlayerId}`]: (votes[targetPlayerId]||0)+1,
     })
-    showToast('Voto registrado ✓')
+    playPop(); showToast('Voto registrado ✓')
   }
 
   async function advanceToResult() {
@@ -371,14 +383,14 @@ function GameScreen({ roomCode, playerId, onLeave }) {
   // ── LOBBY ──────────────────────────────────────────────────────────────────
   if (room.phase==='lobby') return (
     <div style={s.page}>
-      <div style={s.roomCard}>
+      <div style={s.roomCard} className="glass-shine" onPointerMove={handleShine}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
           <span style={{...s.logoMain,fontSize:36,letterSpacing:8}}>CSDM</span>
           <div style={s.codePill}>Código: <strong style={{color:C.gold,letterSpacing:3}}>{roomCode}</strong></div>
         </div>
 
         {/* Invite link button */}
-        <button onClick={copyInviteLink} style={s.inviteBtn}>
+        <button className="press-fx" onClick={copyInviteLink} style={s.inviteBtn}>
           🔗 Copiar link de invitación
         </button>
 
@@ -395,13 +407,13 @@ function GameScreen({ roomCode, playerId, onLeave }) {
 
         {isHost && (
           <div style={{display:'flex',gap:8,marginBottom:12}}>
-            <button style={{...s.btnSecondary,flex:1,marginTop:0,padding:'10px 8px',fontSize:13}} onClick={()=>setEditorScreen('black')}>✏️ Preguntas</button>
-            <button style={{...s.btnSecondary,flex:1,marginTop:0,padding:'10px 8px',fontSize:13}} onClick={()=>setEditorScreen('white')}>✏️ Respuestas</button>
+            <button className="press-fx" style={{...s.btnSecondary,flex:1,marginTop:0,padding:'10px 8px',fontSize:13}} onClick={()=>setEditorScreen('black')}>✏️ Preguntas</button>
+            <button className="press-fx" style={{...s.btnSecondary,flex:1,marginTop:0,padding:'10px 8px',fontSize:13}} onClick={()=>setEditorScreen('white')}>✏️ Respuestas</button>
           </div>
         )}
 
         {isHost ? (
-          <button style={{...s.btnPrimary,opacity:players.length<2?.4:1}} onClick={startGame} disabled={players.length<2}>
+          <button className="press-fx" style={{...s.btnPrimary,opacity:players.length<2?.4:1}} onClick={startGame} disabled={players.length<2}>
             {players.length<2 ? 'Esperando más jugadores…' : `¡Empezar con ${players.length} jugadores!`}
           </button>
         ) : (
@@ -412,7 +424,7 @@ function GameScreen({ roomCode, playerId, onLeave }) {
             </span>
           </div>
         )}
-        <button style={s.btnGhost} onClick={leaveRoom}>Salir de la sala</button>
+        <button className="press-fx" style={s.btnGhost} onClick={leaveRoom}>Salir de la sala</button>
       </div>
       {toast&&<Toast msg={toast}/>}
     </div>
@@ -429,7 +441,7 @@ function GameScreen({ roomCode, playerId, onLeave }) {
           <div style={s.resultBanner}>🏆 RONDA TERMINADA</div>
           <BlackCard text={room.currentBlack}/>
           {room.roundWinner ? (
-            <div style={s.winnerBox}>
+            <div style={s.winnerBox} ref={winnerBoxRef} className="glass-shine" onPointerMove={handleShine}>
               <div style={s.sectionLabel}>CARTA MÁS VOTADA</div>
               <div style={s.winnerWhite}>
                 <p style={{color:'#1a1a2e',fontSize:17,fontWeight:700,margin:0,lineHeight:1.4}}>{room.roundWinner.card}</p>
@@ -456,7 +468,7 @@ function GameScreen({ roomCode, playerId, onLeave }) {
             ))}
           </div>
           {isHost
-            ? <button style={s.btnPrimary} onClick={nextRound}>Siguiente ronda →</button>
+            ? <button className="press-fx" style={s.btnPrimary} onClick={nextRound}>Siguiente ronda →</button>
             : <div style={s.waitBox}>Esperando que el host pase a la siguiente ronda…</div>
           }
         </div>
@@ -500,7 +512,7 @@ function GameScreen({ roomCode, playerId, onLeave }) {
                   <div style={{flexShrink:0,marginLeft:14}}>
                     {isMine ? <div style={s.myCardTag}>Tu carta</div>
                     : iVoted ? <div style={s.votedTag}>✓ Votada</div>
-                    : <button onClick={()=>voteCard(sub.playerId)} disabled={!canVote}
+                    : <button className="press-fx" onClick={()=>voteCard(sub.playerId)} disabled={!canVote}
                         style={{...s.voteBtn,opacity:canVote?1:0.35,cursor:canVote?'pointer':'default'}}>
                         VOTAR
                       </button>
@@ -511,7 +523,7 @@ function GameScreen({ roomCode, playerId, onLeave }) {
             })}
           </div>
           {isHost && (
-            <button style={{...s.btnPrimary,marginTop:20,background:'linear-gradient(135deg,#7C3AED,#6D28D9)'}} onClick={advanceToResult}>
+            <button className="press-fx" style={{...s.btnPrimary,marginTop:20,background:'linear-gradient(135deg,#7C3AED,#6D28D9)'}} onClick={advanceToResult}>
               Ver resultados ({votedCount}/{players.length} votaron) →
             </button>
           )}
@@ -563,7 +575,7 @@ function GameScreen({ roomCode, playerId, onLeave }) {
                 />
               ))}
             </div>
-            <button style={{...s.btnPrimary,opacity:selectedIdx===null?.35:1}} disabled={selectedIdx===null} onClick={submitCard}>
+            <button className="press-fx" style={{...s.btnPrimary,opacity:selectedIdx===null?.35:1}} disabled={selectedIdx===null} onClick={submitCard}>
               Enviar carta
             </button>
           </>
@@ -606,7 +618,7 @@ function CardEditor({ roomCode, type, onBack }) {
     <div style={s.page}>
       <div style={{width:'100%',maxWidth:620}}>
         <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16}}>
-          <button onClick={onBack} style={s.backBtn}>← Volver</button>
+          <button className="press-fx" onClick={onBack} style={s.backBtn}>← Volver</button>
           <h2 style={{color:C.bright,fontSize:17,fontWeight:800,margin:0}}>
             {isBlack ? '✏️ Preguntas (cartas negras)' : '✏️ Respuestas (cartas blancas)'}
           </h2>
@@ -616,20 +628,20 @@ function CardEditor({ roomCode, type, onBack }) {
           <input style={{...s.input,flex:1}} value={newCard} onChange={e=>setNewCard(e.target.value)}
             placeholder={isBlack?'Nueva pregunta con ___ para el espacio…':'Nueva respuesta…'}
             onKeyDown={e=>e.key==='Enter'&&addCard()} />
-          <button style={{...s.joinBtn,padding:'12px 16px'}} onClick={addCard}>+ Agregar</button>
+          <button className="press-fx" style={{...s.joinBtn,padding:'12px 16px'}} onClick={addCard}>+ Agregar</button>
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:16,maxHeight:'55vh',overflowY:'auto'}}>
           {cards.map((card,i)=>(
             <div key={i} style={{background:isBlack?'#111':'#fff',border:`2px solid ${isBlack?'#333':C.border}`,borderRadius:10,padding:'10px 14px',display:'flex',alignItems:'center',gap:10}}>
               <input style={{flex:1,background:'transparent',border:'none',outline:'none',color:isBlack?'#fff':'#1a1a2e',fontSize:14,fontWeight:600,fontFamily:'inherit'}}
                 value={card} onChange={e=>{ const c=[...cards]; c[i]=e.target.value; setCards(c) }}/>
-              <button onClick={()=>setCards(cards.filter((_,idx)=>idx!==i))} style={{background:'rgba(239,68,68,0.15)',border:'none',color:'#F87171',borderRadius:6,width:28,height:28,cursor:'pointer',fontSize:14,flexShrink:0}}>✕</button>
+              <button className="press-fx" onClick={()=>setCards(cards.filter((_,idx)=>idx!==i))} style={{background:'rgba(239,68,68,0.15)',border:'none',color:'#F87171',borderRadius:6,width:28,height:28,cursor:'pointer',fontSize:14,flexShrink:0}}>✕</button>
             </div>
           ))}
         </div>
         <div style={{display:'flex',gap:8}}>
-          <button style={{...s.btnGhost,flex:1,marginTop:0}} onClick={()=>setCards([...defaultDeck])}>Restaurar originales</button>
-          <button style={{...s.btnPrimary,flex:2,marginTop:0,opacity:saving?.5:1}} disabled={saving} onClick={save}>{saving?'Guardando...':'Guardar'}</button>
+          <button className="press-fx" style={{...s.btnGhost,flex:1,marginTop:0}} onClick={()=>setCards([...defaultDeck])}>Restaurar originales</button>
+          <button className="press-fx" style={{...s.btnPrimary,flex:2,marginTop:0,opacity:saving?.5:1}} disabled={saving} onClick={save}>{saving?'Guardando...':'Guardar'}</button>
         </div>
       </div>
     </div>
@@ -647,7 +659,7 @@ function HandCard({ text, selected, onSelect, onEdit }) {
         ? <textarea autoFocus style={s.textarea} value={val} onChange={e=>setVal(e.target.value)} onBlur={()=>{setEditing(false);onEdit(val)}} onClick={e=>e.stopPropagation()} rows={3}/>
         : <p style={{color:'#1a1a2e',fontSize:14,fontWeight:600,lineHeight:1.4,margin:0,flex:1}}>{val}</p>
       }
-      <button style={s.editBtn} onClick={e=>{e.stopPropagation();setEditing(!editing)}}>{editing?'✓':'✏️'}</button>
+      <button className="press-fx" style={s.editBtn} onClick={e=>{e.stopPropagation();setEditing(!editing)}}>{editing?'✓':'✏️'}</button>
       {selected&&!editing&&<div style={s.selBadge}>✓ Seleccionada</div>}
     </div>
   )

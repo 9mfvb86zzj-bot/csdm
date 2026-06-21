@@ -289,6 +289,17 @@ input[type="text"]::placeholder { color:var(--text-muted); }
 /* ===== Liquid Glass pass — keeps every class/selector above intact, ===== */
 /* ===== just adds the glass material + system font to UI chrome.    ===== */
 body, input[type="text"], button, textarea { font-family: var(--font-system); }
+.glass-shine { position: relative; overflow: hidden; }
+.glass-shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(220px circle at var(--mx, 30%) var(--my, 14%), rgba(255,255,255,0.30), transparent 60%);
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  transition: background 0.15s var(--ease);
+}
 .question-card, .spicy-event-box, .stat-box, .leaderboard-wrap, .lb-full-wrap,
 .q-item, .rq-item, input[type="text"], .spicy-toggle, .review-tabs, .editor-tabs {
   background: var(--surface);
@@ -385,7 +396,7 @@ body, input[type="text"], button, textarea { font-family: var(--font-system); }
         <div class="timer-number" id="timer-num">90</div>
       </div>
       <div class="q-meta" id="q-counter">PREGUNTA 1</div>
-      <div class="question-card" id="question-card">
+      <div class="question-card glass-shine" id="question-card">
         <span class="q-number" id="q-abs-num">#1</span>
         <div class="question-text" id="question-text">—</div>
       </div>
@@ -399,7 +410,7 @@ body, input[type="text"], button, textarea { font-family: var(--font-system); }
 
   <!-- SPICY OVERLAY -->
   <div id="spicy-overlay">
-    <div class="spicy-event-box">
+    <div class="spicy-event-box glass-shine">
       <div class="spicy-event-fire">🌶</div>
       <div class="spicy-event-title">RANDOM EVENT</div>
       <div class="spicy-event-sub">Apareció una pregunta picante. ¿La querés responder?</div>
@@ -427,7 +438,7 @@ body, input[type="text"], button, textarea { font-family: var(--font-system); }
       <button class="btn-review" onclick="showReview()">
         🐾 REVISAR RESPUESTAS
       </button>
-      <div class="leaderboard-wrap">
+      <div class="leaderboard-wrap glass-shine">
         <div class="lb-header">TABLA DE PUNTOS <span>TOP</span></div>
         <div id="lb-inline"><div class="lb-empty">Todavía no hay resultados.</div></div>
       </div>
@@ -492,7 +503,7 @@ body, input[type="text"], button, textarea { font-family: var(--font-system); }
   <div id="screen-lb" class="screen">
     <div class="lb-screen-inner">
       <div class="gf-logo" style="margin-bottom:16px;"><div class="gf-logo-badge">JIJEO</div><div class="gf-logo-sub">Tabla de Puntos</div></div>
-      <div class="lb-full-wrap">
+      <div class="lb-full-wrap glass-shine">
         <div class="lb-header">MEJORES PUNTAJES <span>ALL TIME</span></div>
         <div id="lb-full"><div class="lb-empty">¡Jugá primero!</div></div>
       </div>
@@ -1016,6 +1027,17 @@ function updateResultCat(pts){
   else if(pts>=4)  rc.textContent='😿';
   else             rc.textContent='🙀';
 }
+</script>
+<script>
+// Liquid Glass — reactive specular highlight, isolated from the game logic above.
+// Delegated listener so it keeps working across screen switches with no extra wiring.
+document.addEventListener('pointermove', function(e){
+  var el = e.target.closest && e.target.closest('.glass-shine');
+  if(!el) return;
+  var r = el.getBoundingClientRect();
+  el.style.setProperty('--mx', ((e.clientX - r.left) / r.width) * 100 + '%');
+  el.style.setProperty('--my', ((e.clientY - r.top) / r.height) * 100 + '%');
+});
 </script>
 </body>
 </html>
