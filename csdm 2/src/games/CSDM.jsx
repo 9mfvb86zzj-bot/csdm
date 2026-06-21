@@ -5,7 +5,7 @@ import { BLACK_CARDS, WHITE_CARDS, shuffle } from '../cards'
 import { C, wallpaper } from '../theme'
 import { handleShine, playPop, playWin, burstConfettiFromRect } from '../effects'
 
-const VERSION = 'v6.0'
+const VERSION = 'v7.0'
 
 function genCode() { return Math.random().toString(36).substring(2, 7).toUpperCase() }
 function genId()   { return Math.random().toString(36).substring(2, 12) }
