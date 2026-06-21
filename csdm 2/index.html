@@ -13,16 +13,18 @@
 
       /* Liquid Glass microinteractions — shared across every screen */
       .glass-shine { position: relative; overflow: hidden; }
-      .glass-shine::after {
+      .glass-shine::before {
         content: '';
         position: absolute;
         inset: 0;
         border-radius: inherit;
-        background: radial-gradient(220px circle at var(--mx, 30%) var(--my, 14%), rgba(255,255,255,0.38), transparent 60%);
+        background: radial-gradient(180px circle at var(--mx, 30%) var(--my, 12%), rgba(255,255,255,0.22), transparent 60%);
         mix-blend-mode: overlay;
         pointer-events: none;
         transition: background 0.15s cubic-bezier(0.4,0,0.2,1);
+        z-index: 0;
       }
+      .glass-shine > * { position: relative; z-index: 1; }
       .press-fx { transition: transform 0.15s cubic-bezier(0.4,0,0.2,1); }
       .press-fx:active { transform: scale(0.97); }
       @keyframes alConfetti {

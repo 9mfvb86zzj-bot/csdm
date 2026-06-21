@@ -290,16 +290,18 @@ input[type="text"]::placeholder { color:var(--text-muted); }
 /* ===== just adds the glass material + system font to UI chrome.    ===== */
 body, input[type="text"], button, textarea { font-family: var(--font-system); }
 .glass-shine { position: relative; overflow: hidden; }
-.glass-shine::after {
+.glass-shine::before {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: radial-gradient(220px circle at var(--mx, 30%) var(--my, 14%), rgba(255,255,255,0.30), transparent 60%);
+  background: radial-gradient(180px circle at var(--mx, 30%) var(--my, 14%), rgba(255,255,255,0.18), transparent 60%);
   mix-blend-mode: overlay;
   pointer-events: none;
   transition: background 0.15s var(--ease);
+  z-index: 0;
 }
+.glass-shine > * { position: relative; z-index: 1; }
 .question-card, .spicy-event-box, .stat-box, .leaderboard-wrap, .lb-full-wrap,
 .q-item, .rq-item, input[type="text"], .spicy-toggle, .review-tabs, .editor-tabs {
   background: var(--surface);

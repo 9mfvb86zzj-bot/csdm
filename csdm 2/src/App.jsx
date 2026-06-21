@@ -88,28 +88,28 @@ function MenuScreen({ onSelect }) {
         <button style={m.card} className="glass-shine press-fx" onPointerMove={handleShine} onClick={() => { playPop(); onSelect('csdm') }}>
           <span style={m.cardIcon}>🃏</span>
           <span style={m.cardTitle}>CSDM</span>
-          <span style={m.cardDesc}>Hasta dónde te animás · juego de cartas online, +18, 3 a 12 jugadores</span>
+          <span style={m.cardDesc}>Hasta dónde te animás · +18, 3 a 12 jugadores</span>
           <span style={m.cardCta}>Jugar →</span>
         </button>
 
         <button style={m.card} className="glass-shine press-fx" onPointerMove={handleShine} onClick={() => { playPop(); onSelect('anecdotas') }}>
           <span style={m.cardIcon}>🎤</span>
           <span style={m.cardTitle}>ANÉCDOTAS IRL</span>
-          <span style={m.cardDesc}>Leé una consigna, contá tu historia en voz alta y sumá puntos al mejor relato</span>
+          <span style={m.cardDesc}>Contá tu historia y sumá puntos al mejor relato</span>
           <span style={m.cardCta}>Jugar →</span>
         </button>
 
         <button style={m.card} className="glass-shine press-fx" onPointerMove={handleShine} onClick={() => { playPop(); onSelect('nuncanunca') }}>
           <span style={m.cardIcon}>🥂</span>
           <span style={m.cardTitle}>YO NUNCA NUNCA</span>
-          <span style={m.cardDesc}>Consignas al azar por categoría · clásico, fiesta y picante, sin repetir</span>
+          <span style={m.cardDesc}>Consignas al azar · clásico, fiesta y picante</span>
           <span style={m.cardCta}>Jugar →</span>
         </button>
 
         <button style={m.card} className="glass-shine press-fx" onPointerMove={handleShine} onClick={() => { playPop(); window.location.href = '/games/90segundos.html' }}>
           <span style={m.cardIcon}>⏱️</span>
-          <span style={m.cardTitle}>90 SEGUNDOS DE JIJEO</span>
-          <span style={m.cardDesc}>Respondé la mayor cantidad de preguntas posibles en 90 segundos, con modo picante 🌶</span>
+          <span style={m.cardTitle}>90 SEGUNDOS</span>
+          <span style={m.cardDesc}>Respondé rápido, con modo picante 🌶</span>
           <span style={m.cardCta}>Jugar →</span>
         </button>
       </div>
@@ -123,17 +123,17 @@ const m = {
   page: { minHeight: '100vh', width: '100%', background: wallpaper(), display: 'flex', flexDirection: 'column', alignItems: 'center', fontFamily: C.font, color: C.text, padding: '50px 16px 40px', boxSizing: 'border-box' },
   logo: { display: 'block', fontSize: 'clamp(26px, 6.5vw, 38px)', fontWeight: 600, fontFamily: C.font, color: '#fff', letterSpacing: 1, textShadow: `0 0 40px ${C.blue}66` },
   logoSub: { display: 'block', fontSize: 11, letterSpacing: 4, color: C.bluePale, marginTop: 8, fontWeight: 500 },
-  cardsWrap: { display: 'flex', flexDirection: 'column', gap: 16, width: '100%', maxWidth: 420 },
+  cardsWrap: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, width: '100%', maxWidth: 480 },
   card: {
     position: 'relative',
     background: `linear-gradient(135deg, ${C.panelStrong}, ${C.panel})`,
     border: `1px solid ${C.border}`,
     borderRadius: C.radiusLg,
-    padding: '26px 24px',
+    padding: '20px 16px',
     textAlign: 'left',
     display: 'flex',
     flexDirection: 'column',
-    gap: 6,
+    gap: 5,
     cursor: 'pointer',
     fontFamily: 'inherit',
     backdropFilter: C.blurLg,
@@ -141,9 +141,9 @@ const m = {
     boxShadow: `0 20px 50px rgba(0,0,0,0.4), inset 0 1px 0 ${C.glassHighlight}`,
     transition: `transform 0.15s ${C.ease}, border 0.15s ${C.ease}`,
   },
-  cardIcon: { fontSize: 30, marginBottom: 4 },
-  cardTitle: { fontSize: 18, fontWeight: 600, color: '#fff', letterSpacing: 0.5 },
-  cardDesc: { fontSize: 13, color: C.muted, lineHeight: 1.5, fontWeight: 400 },
-  cardCta: { fontSize: 13, color: C.bluePale, fontWeight: 600, marginTop: 8 },
+  cardIcon: { fontSize: 24, marginBottom: 2 },
+  cardTitle: { fontSize: 14.5, fontWeight: 600, color: '#fff', letterSpacing: 0.2, lineHeight: 1.25 },
+  cardDesc: { fontSize: 11.5, color: C.muted, lineHeight: 1.45, fontWeight: 400 },
+  cardCta: { fontSize: 12, color: C.bluePale, fontWeight: 600, marginTop: 6 },
   versionTag: { fontSize: 11, letterSpacing: 2, color: C.muted, marginTop: 32 },
 }
