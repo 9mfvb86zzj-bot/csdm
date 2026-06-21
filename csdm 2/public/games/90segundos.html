@@ -9,18 +9,30 @@
 <style>
 *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
 :root {
-  --violet:#5B3FD8; --violet-dark:#3D28A0; --violet-light:#7B5FEE;
-  --violet-faint:#5B3FD818; --yellow:#FFD93D; --yellow-dark:#E0B800;
-  --yellow-light:#FFE878; --black:#0D0C12; --surface:#13111C;
-  --surface2:#1C1929; --border:#2A2540; --text-muted:#6B6385;
-  --text-dim:#A09AB8; --white:#FFFFFF; --red:#FF4D4D; --orange:#FF9F1C;
-  --spicy:#FF3CAC; --green:#3DFF8F;
+  --violet:#0A84FF; --violet-dark:#0760C2; --violet-light:#4DA6FF;
+  --violet-faint:#0A84FF1f; --yellow:#FFD60A; --yellow-dark:#E0B800;
+  --yellow-light:#FFE14D; --black:#050509; --surface:rgba(255,255,255,0.07);
+  --surface2:rgba(255,255,255,0.05); --border:rgba(255,255,255,0.16); --text-muted:rgba(235,235,245,0.55);
+  --text-dim:rgba(235,235,245,0.72); --white:#f5f5f7; --red:#FF453A; --orange:#FF9F1C;
+  --spicy:#FF375F; --green:#30D158;
+  --blur-sm: blur(14px) saturate(200%) brightness(1.05);
+  --blur-md: blur(22px) saturate(200%) brightness(1.05);
+  --blur-lg: blur(38px) saturate(220%) brightness(1.05);
+  --radius-lg: 28px;
+  --ease: cubic-bezier(0.4,0,0.2,1);
+  --font-system: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif;
 }
-html,body { width:100%; height:100%; background:var(--black); color:var(--white); font-family:'Barlow',sans-serif; overflow:hidden; cursor:none; }
+html,body { width:100%; height:100%; background:
+    radial-gradient(620px circle at 6% -8%, #5e5ce64d, transparent 60%),
+    radial-gradient(580px circle at 108% 14%, #ffd60a33, transparent 60%),
+    radial-gradient(560px circle at 96% 104%, #ff375f4a, transparent 60%),
+    radial-gradient(520px circle at -8% 92%, #0a84ff45, transparent 60%),
+    linear-gradient(160deg, #0b0b14 0%, #050509 100%);
+  color:var(--white); font-family:var(--font-system); overflow:hidden; cursor:none; }
 body::before { content:''; position:fixed; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events:none; z-index:0; }
-.blob { position:fixed; border-radius:50%; pointer-events:none; z-index:0; }
-.blob-1 { width:500px; height:500px; background:#5B3FD820; top:-150px; left:-150px; }
-.blob-2 { width:350px; height:350px; background:#FFD93D08; bottom:-80px; right:-80px; }
+.blob { position:fixed; border-radius:50%; pointer-events:none; z-index:0; filter:blur(60px); }
+.blob-1 { width:500px; height:500px; background:#5e5ce630; top:-150px; left:-150px; }
+.blob-2 { width:350px; height:350px; background:#ffd60a14; bottom:-80px; right:-80px; }
 
 /* CAT CURSOR */
 #cat-cursor { position:fixed; pointer-events:none; z-index:9999; width:38px; height:38px; transform:translate(-50%,-50%); will-change:transform; }
@@ -273,6 +285,36 @@ input[type="text"]::placeholder { color:var(--text-muted); }
 .lb-del-btn:hover { opacity:1; background:#FF4D4D10; }
 .gf-back-menu { position:fixed; top:16px; left:16px; z-index:60; background:var(--surface2); border:1.5px solid var(--border); color:var(--text-dim); font-family:'Barlow Condensed',sans-serif; font-size:12px; letter-spacing:2px; text-transform:uppercase; text-decoration:none; padding:8px 14px; border-radius:8px; transition:border-color 0.15s, color 0.15s; }
 .gf-back-menu:hover { border-color:var(--violet-light); color:var(--white); }
+
+/* ===== Liquid Glass pass — keeps every class/selector above intact, ===== */
+/* ===== just adds the glass material + system font to UI chrome.    ===== */
+body, input[type="text"], button, textarea { font-family: var(--font-system); }
+.question-card, .spicy-event-box, .stat-box, .leaderboard-wrap, .lb-full-wrap,
+.q-item, .rq-item, input[type="text"], .spicy-toggle, .review-tabs, .editor-tabs {
+  background: var(--surface);
+  backdrop-filter: var(--blur-md);
+  -webkit-backdrop-filter: var(--blur-md);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
+}
+.btn-main, .btn-ok, .btn-add, .lb-header, .editor-tab.active, .gf-logo-badge, .review-player-badge, .gf-back-menu {
+  backdrop-filter: var(--blur-sm);
+  -webkit-backdrop-filter: var(--blur-sm);
+}
+.btn-main, .btn-ok {
+  background: linear-gradient(135deg, var(--yellow), var(--yellow-dark));
+  border: 1px solid rgba(255,255,255,0.35);
+  box-shadow: 0 10px 26px rgba(255,214,10,0.32), inset 0 1px 0 rgba(255,255,255,0.5);
+  transition: transform 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+.btn-main:active, .btn-ok:active, .btn-pass:active, .btn-spicy-ok:active { transform: scale(0.97); }
+.btn-secondary, .btn-pass, .btn-spicy-skip, .review-back-btn, .rq-btn, .btn-review {
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: var(--blur-sm);
+  -webkit-backdrop-filter: var(--blur-sm);
+}
+#spicy-overlay { background: rgba(5,5,9,0.55); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+.question-card, .spicy-event-box { border-radius: 22px; }
+.leaderboard-wrap, .lb-full-wrap { border-radius: var(--radius-lg); }
 </style>
 </head>
 <body>

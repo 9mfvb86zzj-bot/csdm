@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { ref, set, get, update, onValue, off } from 'firebase/database'
 import { db } from '../firebase'
 import { BLACK_CARDS, WHITE_CARDS, shuffle } from '../cards'
-import { C } from '../theme'
+import { C, wallpaper } from '../theme'
 
 const VERSION = 'v6.0'
 
@@ -678,61 +678,61 @@ function BlackCard({ text }) {
   )
 }
 function Toast({ msg }) {
-  return <div style={{position:'fixed',bottom:24,left:'50%',transform:'translateX(-50%)',background:C.blue,color:'#fff',padding:'12px 24px',borderRadius:30,fontSize:14,fontWeight:700,boxShadow:'0 8px 32px rgba(0,0,0,0.4)',zIndex:999,whiteSpace:'nowrap',pointerEvents:'none'}}>{msg}</div>
+  return <div style={{position:'fixed',bottom:24,left:'50%',transform:'translateX(-50%)',background:`${C.blue}cc`,backdropFilter:C.blurMd,WebkitBackdropFilter:C.blurMd,color:'#fff',padding:'12px 24px',borderRadius:30,fontSize:14,fontWeight:600,border:'1px solid rgba(255,255,255,0.3)',boxShadow:'0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.35)',zIndex:999,whiteSpace:'nowrap',pointerEvents:'none'}}>{msg}</div>
 }
 
-// ─── STYLES ──────────────────────────────────────────────────────────────────
+// ─── STYLES (Liquid Glass) ────────────────────────────────────────────────────
 const s = {
-  page:{minHeight:'100vh',background:`linear-gradient(160deg,${C.bg} 0%,${C.bgDeep} 100%)`,display:'flex',flexDirection:'column',alignItems:'center',fontFamily:"'Inter','Segoe UI',sans-serif",color:C.text,padding:'20px 16px 60px'},
-  homeCard:{background:C.panel,border:`1px solid ${C.border}`,borderRadius:20,padding:'40px 32px',width:'100%',maxWidth:420,boxShadow:'0 32px 80px rgba(0,0,0,0.5)',marginTop:40},
-  roomCard:{background:C.panel,border:`1px solid ${C.border}`,borderRadius:20,padding:'28px 24px',width:'100%',maxWidth:460,boxShadow:'0 32px 80px rgba(0,0,0,0.5)',marginTop:20},
-  logoMain:{display:'block',fontSize:72,fontWeight:900,fontFamily:"'Georgia','Times New Roman',serif",color:'#fff',letterSpacing:10,lineHeight:1,textShadow:`0 0 60px ${C.blue}88`},
-  logoSub:{display:'block',fontSize:11,letterSpacing:4,color:C.bluePale,marginTop:6,fontWeight:600},
-  tabs:{display:'flex',gap:6,margin:'14px 0',background:'rgba(0,0,0,0.3)',borderRadius:10,padding:4},
-  tabOn:{flex:1,background:C.blue,border:'none',color:'#fff',borderRadius:8,padding:'8px 4px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700},
-  tabOff:{flex:1,background:'transparent',border:'none',color:C.muted,borderRadius:8,padding:'8px 4px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:600},
-  input:{width:'100%',background:'rgba(255,255,255,0.06)',border:`1px solid ${C.border}`,borderRadius:10,color:'#fff',padding:'12px 16px',fontSize:15,outline:'none',fontFamily:'inherit',boxSizing:'border-box'},
+  page:{minHeight:'100vh',background:wallpaper(),display:'flex',flexDirection:'column',alignItems:'center',fontFamily:C.font,color:C.text,padding:'20px 16px 60px'},
+  homeCard:{background:`linear-gradient(135deg, ${C.panelStrong}, ${C.panel})`,border:`1px solid ${C.border}`,borderRadius:C.radiusLg,padding:'40px 32px',width:'100%',maxWidth:420,backdropFilter:C.blurLg,WebkitBackdropFilter:C.blurLg,boxShadow:`0 24px 70px rgba(0,0,0,0.45), inset 0 1px 0 ${C.glassHighlight}`,marginTop:40},
+  roomCard:{background:`linear-gradient(135deg, ${C.panelStrong}, ${C.panel})`,border:`1px solid ${C.border}`,borderRadius:C.radiusLg,padding:'28px 24px',width:'100%',maxWidth:460,backdropFilter:C.blurLg,WebkitBackdropFilter:C.blurLg,boxShadow:`0 24px 70px rgba(0,0,0,0.45), inset 0 1px 0 ${C.glassHighlight}`,marginTop:20},
+  logoMain:{display:'block',fontSize:56,fontWeight:600,fontFamily:C.font,color:'#fff',letterSpacing:4,lineHeight:1,textShadow:`0 0 60px ${C.blue}88`},
+  logoSub:{display:'block',fontSize:11,letterSpacing:4,color:C.bluePale,marginTop:6,fontWeight:500},
+  tabs:{display:'flex',gap:6,margin:'14px 0',background:'rgba(0,0,0,0.18)',borderRadius:C.radiusSm,padding:4},
+  tabOn:{flex:1,background:C.blue,border:'none',color:'#fff',borderRadius:8,padding:'8px 4px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:600},
+  tabOff:{flex:1,background:'transparent',border:'none',color:C.muted,borderRadius:8,padding:'8px 4px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:500},
+  input:{width:'100%',background:'rgba(255,255,255,0.07)',border:`1px solid ${C.border}`,borderRadius:10,color:'#fff',padding:'12px 16px',fontSize:15,outline:'none',fontFamily:'inherit',boxSizing:'border-box'},
   errorBox:{color:'#FCA5A5',background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:8,padding:'10px 14px',fontSize:13,marginTop:12},
-  btnPrimary:{width:'100%',background:`linear-gradient(135deg,${C.blue},${C.blueHover})`,border:'none',color:'#fff',borderRadius:12,padding:15,fontSize:16,fontWeight:800,letterSpacing:1,cursor:'pointer',fontFamily:'inherit',marginTop:12,boxShadow:`0 8px 24px ${C.blue}44`},
-  btnSecondary:{width:'100%',background:'transparent',border:`1px solid ${C.border}`,color:C.bluePale,borderRadius:12,padding:13,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',marginTop:8},
+  btnPrimary:{width:'100%',background:`linear-gradient(135deg,${C.blue},${C.blueHover})`,border:'1px solid rgba(255,255,255,0.3)',color:'#fff',borderRadius:C.radiusMd,padding:15,fontSize:16,fontWeight:600,letterSpacing:0.5,cursor:'pointer',fontFamily:'inherit',marginTop:12,boxShadow:`0 10px 26px ${C.blue}44, inset 0 1px 0 rgba(255,255,255,0.4)`},
+  btnSecondary:{width:'100%',background:C.panel,border:`1px solid ${C.border}`,color:C.bluePale,borderRadius:C.radiusMd,padding:13,fontSize:14,fontWeight:600,cursor:'pointer',fontFamily:'inherit',marginTop:8,backdropFilter:C.blurSm,WebkitBackdropFilter:C.blurSm},
   btnGhost:{width:'100%',background:'transparent',border:`1px solid ${C.border}`,color:C.muted,borderRadius:10,padding:12,fontSize:14,cursor:'pointer',fontFamily:'inherit',marginTop:10},
-  backBtn:{background:'transparent',border:`1px solid ${C.border}`,color:C.bluePale,borderRadius:8,padding:'8px 14px',fontSize:14,cursor:'pointer',fontFamily:'inherit',fontWeight:600,flexShrink:0},
-  inviteBtn:{width:'100%',background:`linear-gradient(135deg,${C.green}22,${C.green}11)`,border:`1px solid ${C.green}55`,color:C.green,borderRadius:10,padding:'12px 16px',fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',marginBottom:18,letterSpacing:0.5},
+  backBtn:{background:C.panel,border:`1px solid ${C.border}`,color:C.bluePale,borderRadius:8,padding:'8px 14px',fontSize:14,cursor:'pointer',fontFamily:'inherit',fontWeight:500,flexShrink:0,backdropFilter:C.blurSm,WebkitBackdropFilter:C.blurSm},
+  inviteBtn:{width:'100%',background:`${C.green}22`,border:`1px solid ${C.green}55`,color:C.green,borderRadius:10,padding:'12px 16px',fontSize:14,fontWeight:600,cursor:'pointer',fontFamily:'inherit',marginBottom:18,letterSpacing:0.3,backdropFilter:C.blurSm,WebkitBackdropFilter:C.blurSm},
   codePill:{background:C.blueFaint,border:`1px solid ${C.border}`,borderRadius:8,padding:'6px 14px',fontSize:14,color:C.bluePale},
-  sectionLabel:{fontSize:11,letterSpacing:3,color:C.muted,fontWeight:700,marginBottom:10},
-  lobbyRow:{display:'flex',alignItems:'center',gap:10,background:'rgba(255,255,255,0.04)',border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 14px'},
+  sectionLabel:{fontSize:11,letterSpacing:3,color:C.muted,fontWeight:600,marginBottom:10},
+  lobbyRow:{display:'flex',alignItems:'center',gap:10,background:'rgba(255,255,255,0.05)',border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 14px'},
   dot:{width:8,height:8,borderRadius:'50%',flexShrink:0},
-  youBadge:{fontSize:11,fontWeight:700,color:C.blue,background:C.blueFaint,padding:'2px 8px',borderRadius:20},
+  youBadge:{fontSize:11,fontWeight:600,color:C.blue,background:C.blueFaint,padding:'2px 8px',borderRadius:20},
   waitBox:{background:C.blueFaint,border:`1px solid ${C.border}`,borderRadius:10,padding:14,color:C.bluePale,textAlign:'center',fontSize:14,marginTop:12,lineHeight:1.6},
-  emptyBox:{background:'rgba(255,255,255,0.04)',border:`1px solid ${C.border}`,borderRadius:10,padding:20,textAlign:'center',color:C.muted,fontSize:14,lineHeight:1.8},
-  publicRow:{display:'flex',justifyContent:'space-between',alignItems:'center',background:'rgba(255,255,255,0.04)',border:`1px solid ${C.border}`,borderRadius:10,padding:'12px 14px'},
-  joinBtn:{background:C.blue,border:'none',color:'#fff',borderRadius:8,padding:'8px 16px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700},
-  header:{width:'100%',maxWidth:640,background:'rgba(8,15,46,0.85)',backdropFilter:'blur(12px)',borderBottom:`1px solid ${C.border}`,borderRadius:'0 0 16px 16px',padding:'10px 18px',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',marginBottom:8,position:'sticky',top:0,zIndex:50},
+  emptyBox:{background:'rgba(255,255,255,0.05)',border:`1px solid ${C.border}`,borderRadius:10,padding:20,textAlign:'center',color:C.muted,fontSize:14,lineHeight:1.8},
+  publicRow:{display:'flex',justifyContent:'space-between',alignItems:'center',background:'rgba(255,255,255,0.05)',border:`1px solid ${C.border}`,borderRadius:10,padding:'12px 14px'},
+  joinBtn:{background:C.blue,border:'none',color:'#fff',borderRadius:8,padding:'8px 16px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:600},
+  header:{width:'100%',maxWidth:640,background:`linear-gradient(135deg, ${C.panelStrong}, ${C.panel})`,backdropFilter:C.blurMd,WebkitBackdropFilter:C.blurMd,borderBottom:`1px solid ${C.border}`,borderRadius:'0 0 18px 18px',padding:'10px 18px',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',marginBottom:8,position:'sticky',top:0,zIndex:50,boxShadow:`inset 0 -1px 0 ${C.glassHighlight}`},
   body:{width:'100%',maxWidth:620,padding:'12px 0'},
   progressRow:{display:'flex',alignItems:'center',gap:10,marginBottom:16},
-  track:{flex:1,height:4,background:'rgba(255,255,255,0.08)',borderRadius:2,overflow:'hidden'},
+  track:{flex:1,height:4,background:'rgba(255,255,255,0.1)',borderRadius:2,overflow:'hidden'},
   fill:{height:'100%',background:`linear-gradient(90deg,${C.blue},${C.blueHover})`,borderRadius:2,transition:'width 0.5s ease'},
-  blackCard:{background:'#080808',border:'3px solid #1a1a2e',borderRadius:16,padding:'26px 24px',marginBottom:20,boxShadow:'0 12px 40px rgba(0,0,0,0.6)'},
-  blackCardSmall:{background:'#080808',border:'2px solid #1a1a2e',borderRadius:12,padding:'16px 20px',marginBottom:14},
+  blackCard:{background:'#0a0a10',border:'1px solid rgba(255,255,255,0.1)',borderRadius:C.radiusLg,padding:'26px 24px',marginBottom:20,boxShadow:'0 16px 48px rgba(0,0,0,0.5)'},
+  blackCardSmall:{background:'#0a0a10',border:'1px solid rgba(255,255,255,0.1)',borderRadius:14,padding:'16px 20px',marginBottom:14},
   voteStatus:{background:C.blueFaint,border:`1px solid ${C.border}`,borderRadius:10,padding:'12px 16px',fontSize:14,color:C.bluePale,textAlign:'center',marginBottom:14,fontWeight:600},
   voteRow:{background:'#fff',borderRadius:14,padding:'14px 16px',display:'flex',alignItems:'center',border:'3px solid transparent',boxShadow:'0 4px 16px rgba(0,0,0,0.2)',transition:'border 0.2s'},
   voteRowVoted:{border:`3px solid ${C.blue}`,background:'#f0f7ff'},
   voteRowMine:{border:`3px solid ${C.gold}55`,background:'#fffbf0'},
-  voteBtn:{background:C.blue,border:'none',color:'#fff',borderRadius:10,padding:'10px 18px',fontSize:14,fontWeight:900,cursor:'pointer',fontFamily:'inherit',letterSpacing:1,boxShadow:`0 4px 16px ${C.blue}55`,minWidth:80},
-  myCardTag:{background:C.gold,color:'#000',fontSize:11,fontWeight:800,padding:'6px 10px',borderRadius:8,letterSpacing:1,whiteSpace:'nowrap'},
-  votedTag:{background:C.blue,color:'#fff',fontSize:11,fontWeight:800,padding:'6px 10px',borderRadius:8,letterSpacing:1,whiteSpace:'nowrap'},
+  voteBtn:{background:C.blue,border:'none',color:'#fff',borderRadius:10,padding:'10px 18px',fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',letterSpacing:0.5,boxShadow:`0 4px 16px ${C.blue}55`,minWidth:80},
+  myCardTag:{background:C.gold,color:'#000',fontSize:11,fontWeight:700,padding:'6px 10px',borderRadius:8,letterSpacing:0.5,whiteSpace:'nowrap'},
+  votedTag:{background:C.blue,color:'#fff',fontSize:11,fontWeight:700,padding:'6px 10px',borderRadius:8,letterSpacing:0.5,whiteSpace:'nowrap'},
   handGrid:{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))',gap:12,marginBottom:16},
   handCard:{background:'#fff',borderRadius:12,padding:14,border:'3px solid transparent',transition:'all 0.15s',boxShadow:'0 4px 16px rgba(0,0,0,0.3)',position:'relative',minHeight:120,display:'flex',flexDirection:'column',cursor:'pointer'},
   handCardOn:{border:`3px solid ${C.blue}`,transform:'translateY(-4px)',boxShadow:`0 12px 32px ${C.blue}44`},
-  textarea:{width:'100%',border:'none',background:'transparent',fontFamily:"'Inter',sans-serif",fontSize:14,fontWeight:600,color:'#1a1a2e',resize:'none',outline:'none',lineHeight:1.4,padding:0,boxSizing:'border-box',flex:1},
+  textarea:{width:'100%',border:'none',background:'transparent',fontFamily:C.font,fontSize:14,fontWeight:600,color:'#1a1a2e',resize:'none',outline:'none',lineHeight:1.4,padding:0,boxSizing:'border-box',flex:1},
   editBtn:{background:'transparent',border:'none',cursor:'pointer',fontSize:12,padding:'2px 4px',alignSelf:'flex-end',marginTop:4,color:'#888'},
-  selBadge:{position:'absolute',bottom:8,right:8,fontSize:10,fontWeight:800,color:C.blue,background:C.blueFaint,padding:'2px 8px',borderRadius:10},
+  selBadge:{position:'absolute',bottom:8,right:8,fontSize:10,fontWeight:700,color:C.blue,background:C.blueFaint,padding:'2px 8px',borderRadius:10},
   sentCard:{background:'#fff',color:'#1a1a2e',borderRadius:12,padding:'16px 20px',fontSize:15,fontWeight:600,maxWidth:300,margin:'0 auto',boxShadow:'0 4px 16px rgba(0,0,0,0.3)',border:`2px solid ${C.green}`},
-  playerChip:{display:'flex',alignItems:'center',gap:6,fontSize:13,color:C.text,background:'rgba(255,255,255,0.04)',padding:'4px 12px',borderRadius:20},
-  resultBanner:{fontSize:22,fontWeight:900,color:C.gold,letterSpacing:2,textAlign:'center',marginBottom:20},
-  winnerBox:{background:C.panel,border:`2px solid ${C.gold}44`,borderRadius:16,padding:20,marginBottom:20,textAlign:'center'},
+  playerChip:{display:'flex',alignItems:'center',gap:6,fontSize:13,color:C.text,background:'rgba(255,255,255,0.05)',padding:'4px 12px',borderRadius:20},
+  resultBanner:{fontSize:22,fontWeight:700,color:C.gold,letterSpacing:1,textAlign:'center',marginBottom:20},
+  winnerBox:{background:`linear-gradient(135deg, ${C.panelStrong}, ${C.panel})`,border:`1px solid ${C.gold}55`,borderRadius:C.radiusLg,padding:20,marginBottom:20,textAlign:'center',backdropFilter:C.blurMd,WebkitBackdropFilter:C.blurMd},
   winnerWhite:{background:'#fff',borderRadius:12,padding:18,maxWidth:280,margin:'0 auto',border:`3px solid ${C.gold}`},
-  voteChip:{display:'flex',alignItems:'center',background:'rgba(255,255,255,0.04)',padding:'4px 12px',borderRadius:20,fontSize:13},
-  scoreboard:{background:'rgba(0,0,0,0.3)',border:`1px solid ${C.border}`,borderRadius:14,padding:16,marginBottom:16},
-  scoreRow:{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid rgba(255,255,255,0.04)'},
+  voteChip:{display:'flex',alignItems:'center',background:'rgba(255,255,255,0.05)',padding:'4px 12px',borderRadius:20,fontSize:13},
+  scoreboard:{background:C.panel,border:`1px solid ${C.border}`,borderRadius:C.radiusMd,padding:16,marginBottom:16,backdropFilter:C.blurMd,WebkitBackdropFilter:C.blurMd},
+  scoreRow:{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid rgba(255,255,255,0.06)'},
 }
