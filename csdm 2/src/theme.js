@@ -7,8 +7,8 @@ export const C = {
   bgDeep: '#050509',
 
   // glass material — translucent, paired with C.blurMd / C.blurLg as backdropFilter
-  panel: 'rgba(255,255,255,0.07)',
-  panelStrong: 'rgba(255,255,255,0.11)',
+  panel: 'rgba(255,255,255,0.05)',
+  panelStrong: 'rgba(255,255,255,0.09)',
   border: 'rgba(255,255,255,0.16)',
   glassHighlight: 'rgba(255,255,255,0.30)',
 
@@ -32,9 +32,9 @@ export const C = {
   bright: '#f5f5f7',
 
   // the glass recipe
-  blurSm: 'blur(14px) saturate(200%) brightness(1.05)',
-  blurMd: 'blur(22px) saturate(200%) brightness(1.05)',
-  blurLg: 'blur(38px) saturate(220%) brightness(1.05)',
+  blurSm: 'blur(14px) saturate(180%)',
+  blurMd: 'blur(22px) saturate(180%)',
+  blurLg: 'blur(38px) saturate(190%)',
   radiusLg: 28,
   radiusMd: 18,
   radiusSm: 12,

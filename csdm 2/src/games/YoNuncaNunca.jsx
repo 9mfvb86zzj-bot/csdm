@@ -134,7 +134,7 @@ const s = {
     boxShadow: `0 24px 70px rgba(0,0,0,0.45), inset 0 1px 0 ${C.glassHighlight}`,
     padding: '28px 26px 30px',
   },
-  backBtn: { background: 'transparent', border: `1px solid ${C.border}`, color: C.bluePale, borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 },
+  backBtn: { background: 'transparent', border: `1px solid ${C.border}`, color: C.bright, borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 },
   logo: { display: 'block', fontSize: 22, fontWeight: 600, color: '#fff', letterSpacing: 0.5 },
   logoSub: { display: 'block', fontSize: 11, letterSpacing: 2, color: C.bluePale, marginTop: 8, fontWeight: 500 },
   chips: { display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 20, flexWrap: 'wrap' },
