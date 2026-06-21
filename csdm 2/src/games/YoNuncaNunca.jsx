@@ -140,8 +140,7 @@ const s = {
   chips: { display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 20, flexWrap: 'wrap' },
   chip: {
     fontFamily: 'inherit', fontSize: 13, fontWeight: 500, padding: '7px 14px', borderRadius: 999,
-    border: `1px solid ${C.border}`, background: C.panel, color: C.muted, cursor: 'pointer',
-    backdropFilter: C.blurSm, WebkitBackdropFilter: C.blurSm,
+    border: `1px solid ${C.border}`, background: C.scrim, color: C.muted, cursor: 'pointer',
     transition: `background 0.25s ${C.ease}, color 0.25s ${C.ease}, transform 0.15s ${C.ease}`,
   },
   chipOn: { background: `${C.blue}88`, borderColor: C.blue, color: '#fff', boxShadow: `0 6px 16px ${C.blue}44` },

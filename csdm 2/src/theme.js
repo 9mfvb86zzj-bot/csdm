@@ -11,6 +11,7 @@ export const C = {
   panelStrong: 'rgba(255,255,255,0.09)',
   border: 'rgba(255,255,255,0.16)',
   glassHighlight: 'rgba(255,255,255,0.30)',
+  scrim: 'rgba(5,5,9,0.42)',
 
   // single primary accent (iOS blue) — used for primary actions and brand glow
   blue: '#0A84FF',
